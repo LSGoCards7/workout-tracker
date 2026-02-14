@@ -335,6 +335,7 @@
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
   .sync-meta { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
   .chart-container { margin: 8px 0; }
+  .overload-badge { color: var(--accent); font-size: 11px; padding: 8px 0 4px; line-height: 1.4; }
 
   /* ===== TABLET (768px+) ===== */
   @media (min-width: 768px) {
@@ -808,6 +809,15 @@ function calcSessionVolume(exerciseData) {
   return total;
 }
 
+function isReadyToProgress(exIndex) {
+  const prog = PROGRAM[state.activeDay];
+  if (!prog) return false;
+  const ex = prog.exercises[exIndex];
+  const d = state.workoutData[exIndex];
+  if (!ex || !d || !ex.repsHigh) return false;
+  return d.sets.every(s => s.completed) && d.sets.every(s => (s.reps || 0) >= ex.repsHigh);
+}
+
 // ===== INDEXEDDB BACKUP =====
 function openIDB() {
   return new Promise((resolve, reject) => {
@@ -1238,6 +1248,7 @@ function renderWorkout() {
       </div>
       <div class="sets-container">${setsHTML}</div>
       <input class="notes-input" placeholder="Notes..." value="${esc(d.notes || '')}" oninput="state.workoutData[${i}].notes=this.value">
+      ${isReadyToProgress(i) ? `<div class="overload-badge">${d.weight >= 50 ? 'At max weight — try a harder technique' : 'Hit ' + ex.repsHigh + ' on all sets — try ' + (d.weight + 5) + ' lbs next time'}</div>` : ''}
     </div>`;
   }).join("");
 
