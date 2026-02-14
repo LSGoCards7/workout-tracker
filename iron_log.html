@@ -640,7 +640,13 @@ function completeSet(exIndex, setIndex, restTime) {
   if (!state.history[today]) state.history[today] = {};
   state.history[today][state.activeDay] = JSON.parse(JSON.stringify(state.workoutData));
   saveData();
-  startRest(restTime);
+  const autoRest = localStorage.getItem('ironlog-autorest') !== 'false';
+  if (autoRest) {
+    const prog = PROGRAM[state.activeDay];
+    const isLastSet = setIndex === state.workoutData[exIndex].sets.length - 1;
+    const isLastExercise = exIndex === prog.exercises.length - 1;
+    if (!(isLastExercise && isLastSet)) startRest(restTime);
+  }
   render();
 }
 
@@ -1381,6 +1387,16 @@ function renderSettings() {
       <div class="settings-row">
         <div class="info"><div class="title">Check for Updates</div><div class="sub">Check if a new version is available</div></div>
         <button class="settings-btn" onclick="checkForUpdates()">Check</button>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">Workout</div>
+      <div class="settings-row">
+        <div class="info">
+          <div class="title">Auto-Start Rest Timer</div>
+          <div class="sub">Start rest timer after completing a set</div>
+        </div>
+        <button class="settings-btn${localStorage.getItem('ironlog-autorest') === 'false' ? '' : ' primary'}" onclick="localStorage.setItem('ironlog-autorest', localStorage.getItem('ironlog-autorest') === 'false' ? 'true' : 'false');render()">${localStorage.getItem('ironlog-autorest') === 'false' ? 'Off' : 'On'}</button>
       </div>
     </div>
     <div class="settings-section">
