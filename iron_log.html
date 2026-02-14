@@ -88,9 +88,12 @@
   .workout-header .center h1 { font-size: 20px; font-weight: 700; color: #f8fafc; text-align: center; }
   .workout-header .center p { font-size: 12px; color: #64748b; text-align: center; margin-top: 2px; }
 
-  .rest-banner { background: #7c2d12; border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 16px; }
-  .rest-banner .rest-label { font-size: 12px; font-weight: 700; color: #fed7aa; letter-spacing: 2px; }
-  .rest-banner .rest-time { font-size: 28px; font-weight: 800; color: #fb923c; }
+  #rest-timer { position: fixed; top: 0; left: 0; right: 0; z-index: 150; }
+  #rest-timer:empty { display: none; }
+  .rest-pill { background: rgba(124,45,18,0.92); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 10px 20px; display: flex; align-items: center; justify-content: center; gap: 16px; }
+  .rest-pill .rest-label { font-size: 12px; font-weight: 700; color: #fed7aa; letter-spacing: 2px; }
+  .rest-pill .rest-time { font-size: 28px; font-weight: 800; color: #fb923c; font-variant-numeric: tabular-nums; }
+  .timer-active { padding-top: 56px; }
 
   .exercise-list { display: flex; flex-direction: column; gap: 16px; }
   .exercise-card { background: #1e293b; border-radius: 10px; padding: 16px; border: 1px solid #334155; border-left: 4px solid #334155; }
@@ -154,6 +157,7 @@
 </head>
 <body>
 <div id="app"></div>
+<div id="rest-timer"></div>
 
 <script>
 const PROGRAM = {
@@ -220,7 +224,7 @@ const CHECKLIST_ITEMS = [
   "Logged every session with weight, reps, sets, and tempo",
 ];
 
-let state = { view: "home", activeDay: null, workoutData: {}, history: {}, checklist: {}, restTimer: null, restTimeLeft: 0, restInterval: null };
+let state = { view: "home", activeDay: null, workoutData: {}, history: {}, checklist: {}, restTimer: null, restTimeLeft: 0, restInterval: null, restDuration: 0 };
 
 function getToday() { return new Date().toISOString().split("T")[0]; }
 function getDayName() { return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date().getDay()]; }
@@ -283,17 +287,27 @@ function finishWorkout() {
   saveData(); state.view = "home"; state.activeDay = null; state.workoutData = {}; stopRest(); render();
 }
 
-function startRest(seconds) {
-  stopRest(); state.restTimeLeft = seconds;
-  state.restInterval = setInterval(() => {
-    state.restTimeLeft--;
-    if (state.restTimeLeft <= 0) { stopRest(); }
-    render();
-  }, 1000);
-  render();
+function renderTimer() {
+  const el = document.getElementById("rest-timer");
+  if (state.restTimeLeft > 0) {
+    el.innerHTML = `<div class="rest-pill"><span class="rest-label">REST</span><span class="rest-time">${state.restTimeLeft}s</span><button class="btn-skip" onclick="stopRest()">Skip</button></div>`;
+  } else {
+    el.innerHTML = "";
+  }
+  document.getElementById("app").classList.toggle("timer-active", state.restTimeLeft > 0);
 }
 
-function stopRest() { if (state.restInterval) clearInterval(state.restInterval); state.restInterval = null; state.restTimeLeft = 0; }
+function startRest(seconds) {
+  stopRest(); state.restTimeLeft = seconds; state.restDuration = seconds;
+  state.restInterval = setInterval(() => {
+    state.restTimeLeft--;
+    if (state.restTimeLeft <= 0) { stopRest(); return; }
+    renderTimer();
+  }, 1000);
+  renderTimer();
+}
+
+function stopRest() { if (state.restInterval) clearInterval(state.restInterval); state.restInterval = null; state.restTimeLeft = 0; state.restDuration = 0; renderTimer(); }
 
 function toggleChecklist(i) {
   const wid = getWeekId(new Date()); const cur = state.checklist[wid] || [];
@@ -368,11 +382,6 @@ function renderHome() {
 function renderWorkout() {
   const prog = PROGRAM[state.activeDay]; const data = state.workoutData;
 
-  let restHTML = "";
-  if (state.restTimeLeft > 0) {
-    restHTML = `<div class="rest-banner"><span class="rest-label">REST</span><span class="rest-time">${state.restTimeLeft}s</span><button class="btn-skip" onclick="stopRest();render()">Skip</button></div>`;
-  }
-
   let exercises = prog.exercises.map((ex, i) => {
     const d = data[i]; if (!d) return "";
     const allDone = d.sets.every(s => s.completed);
@@ -421,7 +430,6 @@ function renderWorkout() {
       <div class="center"><h1>${state.activeDay}</h1><p>${prog.subtitle}</p></div>
       <button class="btn-finish" onclick="finishWorkout()">Finish ✓</button>
     </div>
-    ${restHTML}
     <div class="exercise-list">${exercises}</div>
     <button class="btn-finish-lg" onclick="finishWorkout()">Complete Workout ✓</button>`;
 }
