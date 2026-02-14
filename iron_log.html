@@ -341,6 +341,12 @@
   .heatmap-container { margin: 0 0 24px; text-align: center; }
   .heatmap-container text { font-family: 'JetBrains Mono', monospace; }
 
+  /* ===== PROGRESSION CHARTS ===== */
+  .progress-ex-name { cursor: pointer; }
+  .progress-ex-name .expand-indicator { display: inline-block; width: 12px; font-size: 10px; color: var(--text-dim); }
+  .progress-charts { padding: 8px 0; }
+  .progress-chart-title { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin: 8px 0 4px; }
+
   /* ===== PR BADGES ===== */
   .pr-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .pr-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; border: 1px solid #b45309; color: #fbbf24; background: rgba(180,83,9,0.15); }
@@ -389,6 +395,7 @@
     .history-block .history-card:nth-child(odd) { margin-right: 4px; }
     .progress-ex-row { display: inline-block; width: calc(50% - 4px); vertical-align: top; }
     .progress-ex-row:nth-child(odd) { margin-right: 4px; }
+    .progress-ex-row.expanded { display: block; width: 100%; margin-right: 0; }
   }
 </style>
 </head>
@@ -508,7 +515,7 @@ const CHECKLIST_ITEMS = [
   "Logged every session with weight, reps, sets, and tempo",
 ];
 
-let state = { view: "home", activeDay: null, workoutData: {}, history: {}, checklist: {}, restTimer: null, restTimeLeft: 0, restInterval: null, restDuration: 0, lastExportDate: null, backupDismissDate: null, syncKey: null, syncEnabled: true, lastSyncedAt: null, syncStatus: 'idle', needsSync: false, workoutStartTime: null, prToastedThisSession: new Set() };
+let state = { view: "home", activeDay: null, workoutData: {}, history: {}, checklist: {}, restTimer: null, restTimeLeft: 0, restInterval: null, restDuration: 0, lastExportDate: null, backupDismissDate: null, syncKey: null, syncEnabled: true, lastSyncedAt: null, syncStatus: 'idle', needsSync: false, workoutStartTime: null, prToastedThisSession: new Set(), expandedChart: null };
 let syncDebounceTimer = null;
 
 function getToday() { return new Date().toISOString().split("T")[0]; }
@@ -1529,11 +1536,27 @@ function renderProgress() {
       if (prs.volumePR) prBadges.push('<span class="pr-badge"><span class="pr-label">Vol</span>' + prs.volumePR.value.toLocaleString() + '</span>');
       if (prBadges.length > 0) prHTML = '<div class="pr-badges">' + prBadges.join('') + '</div>';
 
-      rows += `<div class="progress-ex-row">
-        <div class="progress-ex-name">${esc(ex.name)}</div>
+      const chartKey = dayName + '-' + i;
+      const isExpanded = state.expandedChart === chartKey;
+      const indicator = isExpanded ? '▾' : '▸';
+      let chartsHTML = '';
+      if (isExpanded) {
+        const weightPts = data.map(d => ({label: d.date, value: d.weight}));
+        const volPts = data.map(d => ({label: d.date, value: d.volume}));
+        chartsHTML = '<div class="progress-charts">' +
+          '<div class="progress-chart-title">Weight Over Time</div>' +
+          renderLineChart(weightPts, { yLabel: 'lbs', emptyMsg: 'No weight data' }) +
+          '<div class="progress-chart-title">Volume Over Time</div>' +
+          renderLineChart(volPts, { yLabel: 'lbs', emptyMsg: 'No volume data' }) +
+          '</div>';
+      }
+
+      rows += `<div class="progress-ex-row${isExpanded ? ' expanded' : ''}">
+        <div class="progress-ex-name" onclick="state.expandedChart=state.expandedChart==='${chartKey}'?null:'${chartKey}';render()"><span class="expand-indicator">${indicator}</span>${esc(ex.name)}</div>
         <div class="progress-stats"><span class="progress-stat">${latest.weight}lbs</span>${wdHTML}<span class="progress-sep">·</span><span class="progress-stat">${latest.totalReps} total reps</span>${rdHTML}</div>
         <div class="progress-sessions">${data.length} session${data.length > 1 ? 's' : ''}</div>
         ${prHTML}
+        ${chartsHTML}
       </div>`;
     });
 
