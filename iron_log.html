@@ -787,9 +787,25 @@ function getProgressData(dayName, exIndex) {
   const entries = [];
   Object.keys(state.history).sort().forEach(date => {
     const ex = state.history[date]?.[dayName]?.[exIndex];
-    if (ex) { entries.push({ date, weight: ex.weight, totalReps: ex.sets.reduce((s,x) => s + (x.reps||0), 0), technique: ex.technique, numSets: ex.sets.length }); }
+    if (ex) { entries.push({ date, weight: ex.weight, totalReps: ex.sets.reduce((s,x) => s + (x.reps||0), 0), technique: ex.technique, numSets: ex.sets.length, volume: calcExVolume(ex) }); }
   });
   return entries;
+}
+
+function calcExVolume(exercise) {
+  if (!exercise || !exercise.sets) return 0;
+  const w = exercise.weight || 0;
+  return exercise.sets.reduce((sum, s) => s.completed ? sum + (s.reps || 0) * w : sum, 0);
+}
+
+function calcSessionVolume(exerciseData) {
+  if (!exerciseData) return 0;
+  let total = 0;
+  for (const key in exerciseData) {
+    if (key === '__meta') continue;
+    total += calcExVolume(exerciseData[key]);
+  }
+  return total;
 }
 
 // ===== INDEXEDDB BACKUP =====
@@ -1242,14 +1258,18 @@ function renderHistory() {
   else {
     content = dates.map(date => {
       const dateStr = new Date(date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-      let cards = Object.entries(state.history[date]).map(([dayName, exercises]) => {
+      let cards = Object.entries(state.history[date]).filter(([dayName]) => dayName !== '__meta').map(([dayName, exercises]) => {
         let rows = PROGRAM[dayName]?.exercises.map((ex, i) => {
           const d = exercises[i]; if (!d) return "";
           const reps = d.sets.map(s => s.reps).join("/");
           const tech = d.technique !== "Standard" ? ` · ${d.technique}` : "";
-          return `<div class="history-ex-row"><span class="history-ex-name">${esc(ex.name)}</span><span class="history-ex-detail">${d.weight}lbs · ${reps}${tech}</span></div>`;
+          const vol = calcExVolume(d);
+          const volStr = vol > 0 ? ` · ${vol.toLocaleString()}lbs vol` : '';
+          return `<div class="history-ex-row"><span class="history-ex-name">${esc(ex.name)}</span><span class="history-ex-detail">${d.weight}lbs · ${reps}${tech}${volStr}</span></div>`;
         }).join("") || "";
-        return `<div class="history-card"><div class="history-day-name">${dayName} — ${PROGRAM[dayName]?.subtitle || ''}</div>${rows}</div>`;
+        const sessionVol = calcSessionVolume(exercises);
+        const sessionVolHTML = sessionVol > 0 ? `<div style="text-align:right;font-size:11px;color:var(--accent);font-weight:600;margin-top:8px;padding-top:6px;border-top:1px solid var(--border-subtle)">${sessionVol.toLocaleString()}lbs total volume</div>` : '';
+        return `<div class="history-card"><div class="history-day-name">${dayName} — ${PROGRAM[dayName]?.subtitle || ''}</div>${rows}${sessionVolHTML}</div>`;
       }).join("");
       return `<div class="history-block"><div class="history-date">${dateStr}</div>${cards}</div>`;
     }).join("");
