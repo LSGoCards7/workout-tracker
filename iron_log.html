@@ -334,6 +334,7 @@
   .sync-status-badge.syncing .dot { animation: pulse 1.5s infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
   .sync-meta { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+  .chart-container { margin: 8px 0; }
 
   /* ===== TABLET (768px+) ===== */
   @media (min-width: 768px) {
@@ -980,6 +981,142 @@ function formatTimeAgo(isoStr) {
 }
 
 function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+function renderLineChart(dataPoints, options = {}) {
+  const {
+    width = 300, height = 150, color = 'var(--accent)',
+    yLabel = '', emptyMsg = 'No data yet.',
+    xLabelFn = function(label) {
+      const d = new Date(label + 'T00:00:00');
+      return isNaN(d) ? label : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    },
+    yFormat = function(v) { return String(Math.round(v)); },
+    secondaryData = null, secondaryColor = 'var(--text-muted)'
+  } = options;
+
+  // Filter invalid entries
+  const pts = dataPoints.filter(p => p && typeof p.value === 'number' && isFinite(p.value));
+  if (pts.length === 0) return '<p class="empty-text">' + esc(emptyMsg) + '</p>';
+
+  // LTTB downsampling
+  function lttb(data, threshold) {
+    if (data.length <= threshold || threshold < 3) return data;
+    const out = [data[0]];
+    const every = (data.length - 2) / (threshold - 2);
+    let a = 0;
+    for (let i = 0; i < threshold - 2; i++) {
+      let avgX = 0, avgY = 0, rangeStart = Math.floor((i + 1) * every) + 1;
+      let rangeEnd = Math.min(Math.floor((i + 2) * every) + 1, data.length);
+      let rangeLen = rangeEnd - rangeStart;
+      for (let j = rangeStart; j < rangeEnd; j++) { avgX += j; avgY += data[j].value; }
+      avgX /= rangeLen; avgY /= rangeLen;
+      let maxArea = -1, maxIdx = rangeStart;
+      const pointAX = a, pointAY = data[a].value;
+      let s = Math.floor(i * every) + 1;
+      let e = Math.min(Math.floor((i + 1) * every) + 1, data.length);
+      for (let j = s; j < e; j++) {
+        const area = Math.abs((pointAX - avgX) * (data[j].value - pointAY) - (pointAX - j) * (avgY - pointAY));
+        if (area > maxArea) { maxArea = area; maxIdx = j; }
+      }
+      out.push(data[maxIdx]);
+      a = maxIdx;
+    }
+    out.push(data[data.length - 1]);
+    return out;
+  }
+
+  const sampled = pts.length > 50 ? lttb(pts, 50) : pts;
+  const secSampled = secondaryData
+    ? (function() {
+        const sf = secondaryData.filter(p => p && typeof p.value === 'number' && isFinite(p.value));
+        return sf.length > 50 ? lttb(sf, 50) : sf;
+      })()
+    : null;
+
+  // Y-axis range from all data
+  let allVals = sampled.map(p => p.value);
+  if (secSampled && secSampled.length > 0) allVals = allVals.concat(secSampled.map(p => p.value));
+  let yMin = Math.min.apply(null, allVals), yMax = Math.max.apply(null, allVals);
+  if (yMin === yMax) {
+    const pad = yMin === 0 ? 1 : Math.abs(yMin) * 0.1;
+    yMin -= pad; yMax += pad;
+  } else {
+    const range = yMax - yMin;
+    yMin -= range * 0.1; yMax += range * 0.1;
+  }
+  if (allVals.every(v => v >= 0) && yMin < 0) yMin = 0;
+
+  // Layout
+  const padL = 40, padR = 10, padT = 10, padB = 24;
+  const plotW = width - padL - padR, plotH = height - padT - padB;
+
+  function xPos(i, total) { return padL + (total === 1 ? plotW / 2 : (i / (total - 1)) * plotW); }
+  function yPos(v) { return padT + plotH - ((v - yMin) / (yMax - yMin)) * plotH; }
+
+  // Build SVG parts
+  let gridLines = '', yLabels = '';
+  for (let i = 0; i < 4; i++) {
+    const frac = i / 3, y = padT + plotH - frac * plotH, val = yMin + frac * (yMax - yMin);
+    gridLines += '<line x1="' + padL + '" y1="' + y + '" x2="' + (width - padR) + '" y2="' + y +
+      '" stroke="var(--border-subtle)" stroke-width="0.5"/>';
+    const label = yFormat(val) + (yLabel ? ' ' + yLabel : '');
+    yLabels += '<text x="' + (padL - 3) + '" y="' + (y + 3) +
+      '" text-anchor="end" font-size="8" fill="var(--text-dim)">' + esc(label) + '</text>';
+  }
+
+  // X labels: up to 5 evenly spaced
+  let xLabelsHTML = '';
+  const src = sampled;
+  if (src.length === 1) {
+    xLabelsHTML = '<text x="' + xPos(0, 1) + '" y="' + (height - 4) +
+      '" text-anchor="middle" font-size="7" fill="var(--text-dim)">' + esc(xLabelFn(src[0].label)) + '</text>';
+  } else if (src.length > 1) {
+    const indices = [0];
+    const count = Math.min(5, src.length);
+    for (let i = 1; i < count - 1; i++) {
+      const idx = Math.round((i / (count - 1)) * (src.length - 1));
+      if (idx !== 0 && idx !== src.length - 1 && indices.indexOf(idx) === -1) indices.push(idx);
+    }
+    indices.push(src.length - 1);
+    for (let k = 0; k < indices.length; k++) {
+      const idx = indices[k];
+      xLabelsHTML += '<text x="' + xPos(idx, src.length) + '" y="' + (height - 4) +
+        '" text-anchor="middle" font-size="7" fill="var(--text-dim)">' + esc(xLabelFn(src[idx].label)) + '</text>';
+    }
+  }
+
+  // Secondary line
+  let secLine = '';
+  if (secSampled && secSampled.length > 1) {
+    let secPoints = '';
+    for (let i = 0; i < secSampled.length; i++) {
+      secPoints += xPos(i, secSampled.length) + ',' + yPos(secSampled[i].value) + (i < secSampled.length - 1 ? ' ' : '');
+    }
+    secLine = '<polyline points="' + secPoints + '" fill="none" stroke="' + secondaryColor +
+      '" stroke-width="2" opacity="0.6" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+
+  // Primary line + circles
+  let primaryLine = '', circles = '';
+  if (sampled.length > 1) {
+    let linePoints = '';
+    for (let i = 0; i < sampled.length; i++) {
+      linePoints += xPos(i, sampled.length) + ',' + yPos(sampled[i].value) + (i < sampled.length - 1 ? ' ' : '');
+    }
+    primaryLine = '<polyline points="' + linePoints + '" fill="none" stroke="' + color +
+      '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+  for (let i = 0; i < sampled.length; i++) {
+    const cx = xPos(i, sampled.length), cy = yPos(sampled[i].value);
+    const tip = xLabelFn(sampled[i].label) + ': ' + yFormat(sampled[i].value) + (yLabel ? ' ' + yLabel : '');
+    circles += '<circle cx="' + cx + '" cy="' + cy + '" r="2.5" fill="' + color +
+      '" stroke="var(--bg-surface)" stroke-width="1"><title>' + esc(tip) + '</title></circle>';
+  }
+
+  return '<div class="chart-container"><svg viewBox="0 0 ' + width + ' ' + height +
+    '" role="img" aria-label="Line chart" style="width:100%;height:auto;display:block;font-family:\'JetBrains Mono\',monospace">' +
+    gridLines + yLabels + xLabelsHTML + secLine + primaryLine + circles + '</svg></div>';
+}
 
 function renderHome() {
   const day = getDayName(); const suggested = WEEK_SCHEDULE[day]; const ws = getWeekSessions();

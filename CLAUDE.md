@@ -36,6 +36,15 @@ Organized in order: FOUC `<script>` → `<style>` → `<div id="file-banner">` �
 - Views: `home`, `workout`, `history`, `progress`, `settings`
 - `renderTimer()` updates `#rest-timer` independently (fixed overlay, outside `#app`)
 
+### Chart utility
+- `renderLineChart(dataPoints, options)` — returns SVG markup string, compatible with `render()` innerHTML pattern
+- `dataPoints`: `[{label: string, value: number}]` — label is typically `"YYYY-MM-DD"`
+- `options`: `{width, height, color, yLabel, xLabelFn, emptyMsg, yFormat, secondaryData, secondaryColor}`
+- Uses CSS variables (`--accent`, `--border-subtle`, `--text-dim`, `--bg-surface`) — adapts to dark/light theme automatically
+- LTTB downsampling when >50 points, handles edge cases (0 points, 1 point, flat data, NaN values)
+- `<title>` tooltips on data points (desktop hover only; no touch support yet)
+- No callers yet — first consumer will be Exercise Progression Charts
+
 ### Data persistence
 - **Primary**: LocalStorage under key `ironlog-data`
 - **Backup**: IndexedDB (`ironlog-backup` database) — fire-and-forget write on every save, fallback read if localStorage empty
