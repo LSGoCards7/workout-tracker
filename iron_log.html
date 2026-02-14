@@ -343,6 +343,10 @@ function getWeekId(d) {
 
 function snapWeight(w) { return Math.round(w / 5) * 5; }
 
+function hasCompletedSets(dayData) {
+  return Object.values(dayData).some(ex => ex.sets?.some(s => s.completed));
+}
+
 function loadData() {
   try {
     const raw = localStorage.getItem("ironlog-data");
@@ -429,7 +433,11 @@ function getLastReps(dayName, exIndex, setIndex) {
 
 function getWeekSessions() {
   const wid = getWeekId(new Date()); let c = 0;
-  Object.keys(state.history).forEach(d => { if (getWeekId(d) === wid) c += Object.keys(state.history[d]).length; });
+  Object.keys(state.history).forEach(d => {
+    if (getWeekId(d) === wid) {
+      Object.values(state.history[d]).forEach(dayData => { if (hasCompletedSets(dayData)) c++; });
+    }
+  });
   return c;
 }
 
@@ -452,6 +460,28 @@ function finishWorkout() {
   if (!state.history[today]) state.history[today] = {};
   state.history[today][state.activeDay] = JSON.parse(JSON.stringify(state.workoutData));
   saveData(); state.view = "home"; state.activeDay = null; state.workoutData = {}; stopRest(); render();
+}
+
+// Persist to history on each set completion for crash resilience
+function completeSet(exIndex, setIndex, restTime) {
+  state.workoutData[exIndex].sets[setIndex].completed = true;
+  const today = getToday();
+  if (!state.history[today]) state.history[today] = {};
+  state.history[today][state.activeDay] = JSON.parse(JSON.stringify(state.workoutData));
+  saveData();
+  startRest(restTime);
+  render();
+}
+
+function goBack() {
+  const today = getToday();
+  const anyCompleted = hasCompletedSets(state.workoutData);
+  if (!anyCompleted && state.history[today]?.[state.activeDay]) {
+    delete state.history[today][state.activeDay];
+    if (Object.keys(state.history[today]).length === 0) delete state.history[today];
+    saveData();
+  }
+  state.view = "home"; state.activeDay = null; state.workoutData = {}; stopRest(); render();
 }
 
 function renderTimer() {
@@ -788,7 +818,7 @@ function renderHome() {
 
   let todayHTML = "";
   if (suggested) {
-    const hasDone = state.history[today]?.[suggested];
+    const hasDone = state.history[today]?.[suggested] && hasCompletedSets(state.history[today][suggested]);
     todayHTML = `<div class="today-card">
       <div class="label">TODAY — ${day.toUpperCase()}</div>
       <h2>${suggested}</h2>
@@ -800,7 +830,7 @@ function renderHome() {
   }
 
   let dayCards = DAYS_ORDER.map(d => {
-    const done = state.history[today]?.[d];
+    const done = state.history[today]?.[d] && hasCompletedSets(state.history[today][d]);
     return `<button class="day-card${done ? ' done' : ''}" onclick="startWorkout('${d}')">
       <span class="name">${d}</span><span class="sub">${PROGRAM[d].subtitle}</span>${done ? '<span class="done-label">✓ Done</span>' : ''}
     </button>`;
@@ -853,7 +883,7 @@ function renderWorkout() {
           <button class="num-btn-sm" onclick="state.workoutData[${i}].sets[${si}].reps++;render()">+</button>
         </div>
         <span class="reps-label">reps</span>
-        ${!s.completed ? `<button class="btn-done" onclick="state.workoutData[${i}].sets[${si}].completed=true;startRest(${ex.rest});render()">Done</button>` : '<span class="done-check">✓</span>'}
+        ${!s.completed ? `<button class="btn-done" onclick="completeSet(${i},${si},${ex.rest})">Done</button>` : '<span class="done-check">✓</span>'}
       </div>`;
     }).join("");
 
@@ -884,7 +914,7 @@ function renderWorkout() {
 
   return `
     <div class="workout-header">
-      <button class="btn-outline" onclick="if(confirm('Save and exit?'))finishWorkout()">← Back</button>
+      <button class="btn-outline" onclick="goBack()">← Back</button>
       <div class="center"><h1>${state.activeDay}</h1><p>${prog.subtitle}</p></div>
       <button class="btn-finish" onclick="finishWorkout()">Finish ✓</button>
     </div>
