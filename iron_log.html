@@ -278,9 +278,9 @@ const PROGRAM = {
     subtitle: "Push Focus",
     exercises: [
       { name: "DB Floor Press", sets: 4, repsLow: 8, repsHigh: 10, tempo: "3-2-1-0", defaultWeight: 50, note: "2-sec pause at bottom eliminates stretch reflex.", rest: 90 },
-      { name: "Incline DB Press", sets: 3, repsLow: 10, repsHigh: 12, tempo: "3-1-1-0", defaultWeight: 42, note: "Use angled surface or propped pillows.", rest: 90 },
+      { name: "Incline DB Press", sets: 3, repsLow: 10, repsHigh: 12, tempo: "3-1-1-0", defaultWeight: 40, note: "Use angled surface or propped pillows.", rest: 90 },
       { name: "Seated OH Press (wall)", sets: 3, repsLow: 8, repsHigh: 10, tempo: "3-1-1-0", defaultWeight: 40, note: "Back against wall. No leaning.", rest: 90 },
-      { name: "Lateral Raise", sets: 3, repsLow: 12, repsHigh: 15, tempo: "2-1-2-0", defaultWeight: 17, note: "Slow up AND down. No swinging.", rest: 60 },
+      { name: "Lateral Raise", sets: 3, repsLow: 12, repsHigh: 15, tempo: "2-1-2-0", defaultWeight: 15, note: "Slow up AND down. No swinging.", rest: 60 },
       { name: "OH Tricep Extension", sets: 3, repsLow: 10, repsHigh: 12, tempo: "3-1-1-0", defaultWeight: 45, note: "Both arms, single DB.", rest: 60 },
     ],
   },
@@ -300,8 +300,8 @@ const PROGRAM = {
       { name: "Single Arm DB Row", sets: 4, repsLow: 8, repsHigh: 10, tempo: "2-1-1-2", defaultWeight: 50, note: "Each arm. 2-sec squeeze at top.", rest: 90 },
       { name: "Chest-Supported Row", sets: 3, repsLow: 10, repsHigh: 12, tempo: "2-1-1-1", defaultWeight: 40, note: "Lie face down on angled surface. Per hand.", rest: 90 },
       { name: "DB Pullover", sets: 3, repsLow: 12, repsHigh: 15, tempo: "3-0-1-1", defaultWeight: 40, note: "Slight elbow bend. Deep stretch.", rest: 60 },
-      { name: "Seated Alternating Curl", sets: 3, repsLow: 10, repsHigh: 12, tempo: "3-0-1-1", defaultWeight: 27, note: "Each arm. Seated removes momentum.", rest: 60 },
-      { name: "Hammer Curl to Press", sets: 3, repsLow: 10, repsHigh: 10, tempo: "Controlled", defaultWeight: 27, note: "Curl up, press overhead, lower.", rest: 60 },
+      { name: "Seated Alternating Curl", sets: 3, repsLow: 10, repsHigh: 12, tempo: "3-0-1-1", defaultWeight: 25, note: "Each arm. Seated removes momentum.", rest: 60 },
+      { name: "Hammer Curl to Press", sets: 3, repsLow: 10, repsHigh: 10, tempo: "Controlled", defaultWeight: 25, note: "Curl up, press overhead, lower.", rest: 60 },
     ],
   },
   "Day 5": {
@@ -310,7 +310,7 @@ const PROGRAM = {
       { name: "Concentration Curl", sets: 3, repsLow: 10, repsHigh: 12, tempo: "3-0-1-1", defaultWeight: 25, note: "Each arm. Elbow braced on inner thigh.", rest: 60 },
       { name: "Tricep Kickback", sets: 3, repsLow: 12, repsHigh: 15, tempo: "2-1-1-0", defaultWeight: 20, note: "Each arm. Full extension, squeeze.", rest: 60 },
       { name: "Arnold Press", sets: 3, repsLow: 10, repsHigh: 12, tempo: "Controlled", defaultWeight: 30, note: "Rotation through the press.", rest: 60 },
-      { name: "Reverse Fly", sets: 3, repsLow: 12, repsHigh: 15, tempo: "2-1-2-0", defaultWeight: 17, note: "Bent over. Rear delts.", rest: 60 },
+      { name: "Reverse Fly", sets: 3, repsLow: 12, repsHigh: 15, tempo: "2-1-2-0", defaultWeight: 15, note: "Bent over. Rear delts.", rest: 60 },
       { name: "Lying Leg Raise", sets: 3, repsLow: 15, repsHigh: 20, tempo: "Controlled", defaultWeight: 0, note: "Slow and controlled.", rest: 45 },
     ],
   },
@@ -340,6 +340,8 @@ function getWeekId(d) {
   const weekNo = Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
   return `${date.getFullYear()}-W${String(weekNo).padStart(2,"0")}`;
 }
+
+function snapWeight(w) { return Math.round(w / 5) * 5; }
 
 function loadData() {
   try {
@@ -375,6 +377,21 @@ function loadData() {
       console.warn("Unknown data version:", p.version);
     }
   } catch(e) { console.log("No data yet"); }
+  // Snap stored weights to 5 lb increments
+  let weightFixed = false;
+  for (const date in state.history) {
+    for (const day in state.history[date]) {
+      state.history[date][day].forEach(ex => {
+        if (typeof ex.weight === 'number' && ex.weight % 5 !== 0) {
+          const old = ex.weight;
+          ex.weight = snapWeight(ex.weight);
+          console.log(`[Iron Log] Migrated weight: ${day} ${date}, ${old} → ${ex.weight}`);
+          weightFixed = true;
+        }
+      });
+    }
+  }
+  if (weightFixed) saveData();
   // Load sync settings
   try {
     const sync = localStorage.getItem("ironlog-sync");
@@ -851,9 +868,9 @@ function renderWorkout() {
       <div class="controls-row">
         <div class="control-group"><label class="control-label">Weight (lbs)</label>
           <div class="number-input">
-            <button class="num-btn" onclick="state.workoutData[${i}].weight=Math.max(0,state.workoutData[${i}].weight-5);render()">−</button>
+            <button class="num-btn" onclick="state.workoutData[${i}].weight=Math.max(0,snapWeight(state.workoutData[${i}].weight-5));render()">−</button>
             <span class="num-value">${d.weight}</span>
-            <button class="num-btn" onclick="state.workoutData[${i}].weight+=5;render()">+</button>
+            <button class="num-btn" onclick="state.workoutData[${i}].weight=snapWeight(state.workoutData[${i}].weight+5);render()">+</button>
           </div>
         </div>
         <div class="control-group"><label class="control-label">Technique</label>
