@@ -499,7 +499,7 @@ const CHECKLIST_ITEMS = [
   "Logged every session with weight, reps, sets, and tempo",
 ];
 
-let state = { view: "home", activeDay: null, workoutData: {}, history: {}, checklist: {}, restTimer: null, restTimeLeft: 0, restInterval: null, restDuration: 0, lastExportDate: null, backupDismissDate: null, syncKey: null, syncEnabled: true, lastSyncedAt: null, syncStatus: 'idle', needsSync: false };
+let state = { view: "home", activeDay: null, workoutData: {}, history: {}, checklist: {}, restTimer: null, restTimeLeft: 0, restInterval: null, restDuration: 0, lastExportDate: null, backupDismissDate: null, syncKey: null, syncEnabled: true, lastSyncedAt: null, syncStatus: 'idle', needsSync: false, workoutStartTime: null };
 let syncDebounceTimer = null;
 
 function getToday() { return new Date().toISOString().split("T")[0]; }
@@ -557,6 +557,7 @@ function loadData() {
   let weightFixed = false;
   for (const date in state.history) {
     for (const day in state.history[date]) {
+      if (day === '__meta') continue;
       state.history[date][day].forEach(ex => {
         if (typeof ex.weight === 'number' && ex.weight % 5 !== 0) {
           const old = ex.weight;
@@ -568,6 +569,14 @@ function loadData() {
     }
   }
   if (weightFixed) saveData();
+  // Clean up orphaned startTimes (crash recovery without finish)
+  for (const date in state.history) {
+    const meta = state.history[date].__meta;
+    if (meta && meta.startTime && !meta.duration) {
+      delete meta.startTime;
+      if (Object.keys(meta).length === 0) delete state.history[date].__meta;
+    }
+  }
   // Load sync settings
   try {
     const sync = localStorage.getItem("ironlog-sync");
@@ -607,7 +616,7 @@ function getWeekSessions() {
   const wid = getWeekId(new Date()); let c = 0;
   Object.keys(state.history).forEach(d => {
     if (getWeekId(d) === wid) {
-      Object.values(state.history[d]).forEach(dayData => { if (hasCompletedSets(dayData)) c++; });
+      Object.entries(state.history[d]).forEach(([key, dayData]) => { if (key !== '__meta' && hasCompletedSets(dayData)) c++; });
     }
   });
   return c;
@@ -624,6 +633,9 @@ function startWorkout(dayName) {
     });
     state.workoutData = data;
   }
+  const existingMeta = state.history[today]?.__meta;
+  state.workoutStartTime = (existingMeta && existingMeta.startTime && !existingMeta.duration)
+    ? existingMeta.startTime : Date.now();
   state.activeDay = dayName; state.view = "workout"; render();
 }
 
@@ -631,6 +643,12 @@ function finishWorkout() {
   const today = getToday();
   if (!state.history[today]) state.history[today] = {};
   state.history[today][state.activeDay] = JSON.parse(JSON.stringify(state.workoutData));
+  if (state.workoutStartTime) {
+    if (!state.history[today].__meta) state.history[today].__meta = {};
+    state.history[today].__meta.duration = Math.round((Date.now() - state.workoutStartTime) / 1000);
+    delete state.history[today].__meta.startTime;
+  }
+  state.workoutStartTime = null;
   saveData(); state.view = "home"; state.activeDay = null; state.workoutData = {}; stopRest(); render();
 }
 
@@ -640,6 +658,10 @@ function completeSet(exIndex, setIndex, restTime) {
   const today = getToday();
   if (!state.history[today]) state.history[today] = {};
   state.history[today][state.activeDay] = JSON.parse(JSON.stringify(state.workoutData));
+  if (state.workoutStartTime) {
+    if (!state.history[today].__meta) state.history[today].__meta = {};
+    if (!state.history[today].__meta.startTime) state.history[today].__meta.startTime = state.workoutStartTime;
+  }
   saveData();
   const autoRest = localStorage.getItem('ironlog-autorest') !== 'false';
   if (autoRest) {
@@ -694,7 +716,7 @@ function toggleChecklist(i) {
 function getDataStats() {
   const dates = Object.keys(state.history);
   let exerciseEntries = 0;
-  dates.forEach(d => Object.values(state.history[d]).forEach(day => { exerciseEntries += Object.keys(day).length; }));
+  dates.forEach(d => Object.entries(state.history[d]).forEach(([key, day]) => { if (key !== '__meta') exerciseEntries += Object.keys(day).length; }));
   return { sessions: dates.length, exerciseEntries };
 }
 
@@ -1269,6 +1291,11 @@ function renderHistory() {
   else {
     content = dates.map(date => {
       const dateStr = new Date(date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+      const meta = state.history[date].__meta;
+      const dur = meta && meta.duration ? (() => {
+        const m = Math.round(meta.duration / 60);
+        return m >= 60 ? Math.floor(m/60) + 'h ' + (m%60) + 'min' : m + ' min';
+      })() : '';
       let cards = Object.entries(state.history[date]).filter(([dayName]) => dayName !== '__meta').map(([dayName, exercises]) => {
         let rows = PROGRAM[dayName]?.exercises.map((ex, i) => {
           const d = exercises[i]; if (!d) return "";
@@ -1280,7 +1307,7 @@ function renderHistory() {
         }).join("") || "";
         const sessionVol = calcSessionVolume(exercises);
         const sessionVolHTML = sessionVol > 0 ? `<div style="text-align:right;font-size:11px;color:var(--accent);font-weight:600;margin-top:8px;padding-top:6px;border-top:1px solid var(--border-subtle)">${sessionVol.toLocaleString()}lbs total volume</div>` : '';
-        return `<div class="history-card"><div class="history-day-name">${dayName} — ${PROGRAM[dayName]?.subtitle || ''}</div>${rows}${sessionVolHTML}</div>`;
+        return `<div class="history-card"><div class="history-day-name">${dayName} — ${PROGRAM[dayName]?.subtitle || ''}${dur ? ' · ' + dur : ''}</div>${rows}${sessionVolHTML}</div>`;
       }).join("");
       return `<div class="history-block"><div class="history-date">${dateStr}</div>${cards}</div>`;
     }).join("");
