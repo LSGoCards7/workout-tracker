@@ -33,10 +33,10 @@ Phase A (no dependencies, build in any order):
   5. Progressive Overload Advisor   [DONE] 3cfd5e4
 
 Phase B (depends on Phase A):
-  6. Exercise Progression Charts (needs #1 + #2)
-  7. Workout Difficulty Rating (needs #1 + #3)
-  8. Personal Records Board (needs #2)
-  9. Training Frequency Heatmap (needs #1)
+  6. Exercise Progression Charts    [DONE] 5650c31
+  7. Workout Difficulty Rating       [DONE] 97fa1d6
+  8. Personal Records Board          [DONE] 95f6e02
+  9. Training Frequency Heatmap      [DONE] 94f5127
 ```
 
 ---
