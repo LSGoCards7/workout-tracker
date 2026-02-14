@@ -337,6 +337,10 @@
   .chart-container { margin: 8px 0; }
   .overload-badge { color: var(--accent); font-size: 11px; padding: 8px 0 4px; line-height: 1.4; }
 
+  /* ===== HEATMAP ===== */
+  .heatmap-container { margin: 0 0 24px; text-align: center; }
+  .heatmap-container text { font-family: 'JetBrains Mono', monospace; }
+
   /* ===== TABLET (768px+) ===== */
   @media (min-width: 768px) {
     #app { max-width: 720px; padding: 24px 32px 100px; }
@@ -838,6 +842,97 @@ function isReadyToProgress(exIndex) {
   const d = state.workoutData[exIndex];
   if (!ex || !d || !ex.repsHigh) return false;
   return d.sets.every(s => s.completed) && d.sets.every(s => (s.reps || 0) >= ex.repsHigh);
+}
+
+function renderHeatmap() {
+  const totalDays = 84; // 12 weeks
+  const today = new Date(); today.setHours(0,0,0,0);
+  // Walk back to start: align to Monday of the earliest week
+  const todayDOW = (today.getDay() + 6) % 7; // Mon=0..Sun=6
+  const endDate = new Date(today);
+  const startDate = new Date(today);
+  startDate.setDate(startDate.getDate() - todayDOW - (11 * 7)); // 12 weeks back, start on Monday
+
+  // Build date grid
+  const weeks = [];
+  const cursor = new Date(startDate);
+  let hasAnyWorkout = false;
+  while (cursor <= endDate) {
+    const weekCol = [];
+    for (let d = 0; d < 7; d++) {
+      if (cursor > endDate) { weekCol.push(null); cursor.setDate(cursor.getDate() + 1); continue; }
+      const dateStr = cursor.toISOString().split('T')[0];
+      const entry = state.history[dateStr];
+      let worked = false;
+      if (entry) {
+        for (const key in entry) {
+          if (key === '__meta') continue;
+          if (hasCompletedSets(entry[key])) { worked = true; break; }
+        }
+      }
+      if (worked) hasAnyWorkout = true;
+      weekCol.push({ date: dateStr, worked });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    weeks.push(weekCol);
+  }
+
+  const cellSize = 14, cellGap = 3, step = cellSize + cellGap;
+  const dayLabelW = 20;
+  const topPad = 16;
+  const svgW = dayLabelW + weeks.length * step;
+  const svgH = topPad + 7 * step;
+  const dayLabels = ['M', '', 'W', '', 'F', '', 'S'];
+
+  // Month labels
+  let monthLabelsHTML = '';
+  let lastMonth = -1;
+  for (let w = 0; w < weeks.length; w++) {
+    for (let d = 0; d < 7; d++) {
+      const cell = weeks[w][d];
+      if (!cell) continue;
+      const m = parseInt(cell.date.substring(5, 7));
+      if (m !== lastMonth) {
+        lastMonth = m;
+        const monthName = new Date(cell.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short' });
+        monthLabelsHTML += '<text x="' + (dayLabelW + w * step) + '" y="10" font-size="8" fill="var(--text-dim)">' + esc(monthName) + '</text>';
+        break; // one label per week column at most
+      }
+    }
+  }
+
+  // Day labels
+  let dayLabelsHTML = '';
+  for (let d = 0; d < 7; d++) {
+    if (dayLabels[d]) {
+      dayLabelsHTML += '<text x="' + (dayLabelW - 6) + '" y="' + (topPad + d * step + cellSize - 3) + '" text-anchor="end" font-size="8" fill="var(--text-dim)">' + dayLabels[d] + '</text>';
+    }
+  }
+
+  // Cells
+  let cellsHTML = '';
+  for (let w = 0; w < weeks.length; w++) {
+    for (let d = 0; d < 7; d++) {
+      const cell = weeks[w][d];
+      if (!cell) continue;
+      const x = dayLabelW + w * step;
+      const y = topPad + d * step;
+      const fill = cell.worked ? 'var(--accent)' : 'var(--bg-elevated)';
+      const opacity = cell.worked ? '0.85' : '1';
+      const dateLabel = new Date(cell.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      cellsHTML += '<rect x="' + x + '" y="' + y + '" width="' + cellSize + '" height="' + cellSize +
+        '" rx="2" fill="' + fill + '" opacity="' + opacity + '"><title>' + esc(dateLabel + (cell.worked ? ' - Workout' : '')) + '</title></rect>';
+    }
+  }
+
+  let emptyOverlay = '';
+  if (!hasAnyWorkout) {
+    emptyOverlay = '<text x="' + (svgW / 2) + '" y="' + (svgH / 2 + 4) + '" text-anchor="middle" font-size="10" fill="var(--text-dim)">Start working out to fill your heatmap</text>';
+  }
+
+  return '<div class="heatmap-container"><svg viewBox="0 0 ' + svgW + ' ' + svgH +
+    '" style="width:100%;max-width:' + svgW + 'px;height:auto;display:block;margin:0 auto" role="img" aria-label="Training frequency heatmap">' +
+    monthLabelsHTML + dayLabelsHTML + cellsHTML + emptyOverlay + '</svg></div>';
 }
 
 // ===== INDEXEDDB BACKUP =====
@@ -1356,6 +1451,7 @@ function renderProgress() {
       <button class="btn-outline" onclick="state.view='home';render()">← Back</button>
       <span class="page-title">Progress</span><div style="width:60px"></div>
     </div>
+    ${renderHeatmap()}
     ${content}`;
 }
 
