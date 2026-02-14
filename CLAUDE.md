@@ -19,7 +19,7 @@ IRON LOG — a dumbbell hypertrophy workout tracking PWA. The core application i
 ### File structure
 | File | Purpose |
 |------|---------|
-| `iron_log.html` | The entire app — CSS, HTML, JS inline (~1140 lines) |
+| `iron_log.html` | The entire app — CSS, HTML, JS inline (~1280 lines) |
 | `sw.js` | Service worker — cache-first for app shell, skip sync URLs |
 | `manifest.json` | PWA metadata — name, icons, theme, display mode |
 | `icons/` | PWA icons (192, 512 PNG + apple-touch-icon 180) |
@@ -27,7 +27,7 @@ IRON LOG — a dumbbell hypertrophy workout tracking PWA. The core application i
 | `worker/wrangler.toml` | Worker config — KV namespace binding |
 
 ### HTML structure (`iron_log.html`)
-Organized in order: `<style>` → `<div id="file-banner">` → `<div id="app">` → `<div id="rest-timer">` → `<div id="toast">` → `<script>`.
+Organized in order: FOUC `<script>` → `<style>` → `<div id="file-banner">` → `<div id="app">` → `<div id="rest-timer">` → `<div id="toast">` → `<script>`.
 
 ### State machine rendering
 - Global `state` object tracks current view, selected workout, active exercise, etc.
@@ -71,8 +71,21 @@ Organized in order: `<style>` → `<div id="file-banner">` → `<div id="app">` 
 - Exercises defined in `PROGRAM` array with name, sets, rep range, default weight, tempo, rest time
 - Techniques: standard, dropset, myorep, superset, slow eccentric
 
+### Theming
+- **CSS custom properties**: All colors defined as variables in `[data-theme="dark"]` and `[data-theme="light"]` blocks
+- **Theme attribute**: `data-theme="dark|light"` on `<html>` element controls active theme
+- **Preference storage**: `localStorage.getItem('ironlog-theme')` → `'system'` (default), `'dark'`, or `'light'`
+- **FOUC prevention**: Inline `<script>` in `<head>` reads preference and sets `data-theme` before CSS parses
+- **System tracking**: `matchMedia('prefers-color-scheme: dark')` change listener updates when in `system` mode
+- **Cross-tab sync**: `storage` event listener syncs theme preference across browser tabs
+- **Meta theme-color**: Dynamically updated by `applyTheme()` (`#0f172a` dark, `#f1f5f9` light)
+- **`color-scheme` CSS property**: Set on both theme blocks so native browser elements (scrollbars, selects) adapt
+- **Settings toggle**: 3-way (Auto/Dark/Light) in Settings → Appearance section
+- To add a new themed color: add a variable in both `[data-theme]` blocks, then use `var(--name)` in CSS
+
 ### Styling
 - Dark theme: background `#0f172a`, text `#e2e8f0`, accent `#4ade80`
+- Light theme: background `#f1f5f9`, text `#1e293b`, accent `#16a34a`
 - JetBrains Mono font throughout
 - Mobile-first, max-width 480px, fixed bottom nav bar
 - Responsive breakpoints: 768px (tablet, 720px max), 1200px (desktop, 1000px max)
