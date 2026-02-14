@@ -153,6 +153,51 @@
 
   .history-block { margin-bottom: 20px; }
   .progress-block { margin-bottom: 24px; }
+
+  /* ===== TABLET (768px+) ===== */
+  @media (min-width: 768px) {
+    #app { max-width: 720px; padding: 24px 32px 100px; }
+    .header h1 { font-size: 32px; }
+    .header .sub { font-size: 12px; }
+    .today-card h2 { font-size: 24px; }
+    .today-card .sub { font-size: 14px; }
+    .btn-primary { font-size: 15px; padding: 14px 24px; }
+    .day-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .day-card .name { font-size: 15px; }
+    .day-card .sub { font-size: 13px; }
+    .exercise-card { padding: 20px; }
+    .ex-name { font-size: 16px; }
+    .section-title { font-size: 13px; }
+    .nav-bar { gap: 80px; }
+    .rest-pill { max-width: 720px; margin: 0 auto; }
+    .timer-active { padding-top: 56px; }
+    .page-title { font-size: 22px; }
+    .checklist-text { font-size: 14px; }
+  }
+
+  /* ===== DESKTOP (1200px+) ===== */
+  @media (min-width: 1200px) {
+    #app { max-width: 1000px; padding: 32px 40px 100px; }
+    .header h1 { font-size: 36px; }
+    .header .sub { font-size: 13px; }
+    .today-card { padding: 24px; }
+    .today-card h2 { font-size: 26px; }
+    .btn-primary { font-size: 16px; }
+    .day-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .day-card .name { font-size: 15px; min-width: 80px; }
+    .exercise-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; align-items: start; }
+    .exercise-card { padding: 20px; }
+    .ex-name { font-size: 17px; }
+    .section-title { font-size: 13px; }
+    .nav-bar { gap: 120px; }
+    .rest-pill { max-width: 1000px; }
+    .timer-active { padding-top: 60px; }
+    .page-title { font-size: 24px; }
+    .history-block .history-card { display: inline-block; width: calc(50% - 4px); vertical-align: top; }
+    .history-block .history-card:nth-child(odd) { margin-right: 4px; }
+    .progress-ex-row { display: inline-block; width: calc(50% - 4px); vertical-align: top; }
+    .progress-ex-row:nth-child(odd) { margin-right: 4px; }
+  }
 </style>
 </head>
 <body>
