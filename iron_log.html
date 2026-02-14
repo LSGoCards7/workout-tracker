@@ -341,6 +341,22 @@
   .heatmap-container { margin: 0 0 24px; text-align: center; }
   .heatmap-container text { font-family: 'JetBrains Mono', monospace; }
 
+  /* ===== DIFFICULTY RATING ===== */
+  #difficulty-prompt { position: fixed; inset: 0; z-index: 175; background: rgba(15,23,42,0.85); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; }
+  #difficulty-prompt:empty { display: none; }
+  .difficulty-card { background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: 16px; padding: 24px; max-width: 320px; width: calc(100% - 32px); text-align: center; }
+  .difficulty-title { font-size: 16px; font-weight: 700; color: var(--text-heading); margin-bottom: 4px; }
+  .difficulty-sub { font-size: 12px; color: var(--text-dim); margin-bottom: 16px; }
+  .difficulty-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 16px; }
+  .difficulty-btn { border: none; border-radius: 8px; padding: 12px 0; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer; color: #fff; }
+  .difficulty-btn:active { opacity: 0.8; }
+  .difficulty-skip { background: none; border: 1px solid var(--border-default); border-radius: 8px; padding: 10px; font-size: 13px; font-family: inherit; cursor: pointer; color: var(--text-muted); width: 100%; }
+  .difficulty-skip:active { background: var(--bg-elevated); }
+  .rpe-pip { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 8px; margin-left: 6px; }
+  .rpe-pip.rpe-easy { background: rgba(74,222,128,0.15); color: #4ade80; }
+  .rpe-pip.rpe-medium { background: rgba(250,204,21,0.15); color: #facc15; }
+  .rpe-pip.rpe-hard { background: rgba(248,113,113,0.15); color: #f87171; }
+
   /* ===== PROGRESSION CHARTS ===== */
   .progress-ex-name { cursor: pointer; }
   .progress-ex-name .expand-indicator { display: inline-block; width: 12px; font-size: 10px; color: var(--text-dim); }
@@ -403,6 +419,7 @@
 <div id="file-banner"></div>
 <div id="app"></div>
 <div id="rest-timer"></div>
+<div id="difficulty-prompt"></div>
 <div id="toast"></div>
 
 <script>
@@ -657,15 +674,70 @@ function startWorkout(dayName) {
 }
 
 function finishWorkout() {
+  // Double-tap guard: if overlay is already showing, bail
+  if (document.getElementById('difficulty-prompt').innerHTML !== '') return;
   const today = getToday();
   if (!state.history[today]) state.history[today] = {};
   state.history[today][state.activeDay] = JSON.parse(JSON.stringify(state.workoutData));
+  // Save startTime for crash resilience (data is persisted before overlay)
+  if (state.workoutStartTime) {
+    if (!state.history[today].__meta) state.history[today].__meta = {};
+    if (!state.history[today].__meta.startTime) state.history[today].__meta.startTime = state.workoutStartTime;
+  }
+  saveData();
+  showDifficultyPrompt();
+}
+
+function showDifficultyPrompt() {
+  const el = document.getElementById('difficulty-prompt');
+  const card = document.createElement('div');
+  card.className = 'difficulty-card';
+  const title = document.createElement('div');
+  title.className = 'difficulty-title';
+  title.textContent = 'How hard was that?';
+  const sub = document.createElement('div');
+  sub.className = 'difficulty-sub';
+  sub.textContent = 'Rate workout difficulty (1 = easy, 10 = max effort)';
+  const grid = document.createElement('div');
+  grid.className = 'difficulty-grid';
+  for (let r = 1; r <= 10; r++) {
+    const btn = document.createElement('button');
+    btn.className = 'difficulty-btn';
+    btn.textContent = r;
+    btn.style.background = 'hsl(' + (120 - (r - 1) * 12) + ', 70%, 40%)';
+    btn.onclick = function() { setDifficulty(r); };
+    grid.appendChild(btn);
+  }
+  const skip = document.createElement('button');
+  skip.className = 'difficulty-skip';
+  skip.textContent = 'Skip';
+  skip.onclick = function() { setDifficulty(null); };
+  card.appendChild(title);
+  card.appendChild(sub);
+  card.appendChild(grid);
+  card.appendChild(skip);
+  el.replaceChildren(card);
+  // Backdrop click = skip
+  el.onclick = function(e) { if (e.target === el) setDifficulty(null); };
+}
+
+function setDifficulty(rating) {
+  const today = getToday();
+  if (rating !== null && state.history[today]?.__meta !== undefined) {
+    state.history[today].__meta.difficulty = rating;
+  } else if (rating !== null) {
+    if (!state.history[today]) state.history[today] = {};
+    if (!state.history[today].__meta) state.history[today].__meta = {};
+    state.history[today].__meta.difficulty = rating;
+  }
+  // Compute duration and clean up startTime
   if (state.workoutStartTime) {
     if (!state.history[today].__meta) state.history[today].__meta = {};
     state.history[today].__meta.duration = Math.round((Date.now() - state.workoutStartTime) / 1000);
     delete state.history[today].__meta.startTime;
   }
   state.workoutStartTime = null;
+  document.getElementById('difficulty-prompt').replaceChildren();
   saveData(); state.view = "home"; state.activeDay = null; state.workoutData = {}; stopRest(); render();
 }
 
@@ -1496,7 +1568,12 @@ function renderHistory() {
         }).join("") || "";
         const sessionVol = calcSessionVolume(exercises);
         const sessionVolHTML = sessionVol > 0 ? `<div style="text-align:right;font-size:11px;color:var(--accent);font-weight:600;margin-top:8px;padding-top:6px;border-top:1px solid var(--border-subtle)">${sessionVol.toLocaleString()}lbs total volume</div>` : '';
-        return `<div class="history-card"><div class="history-day-name">${dayName} — ${PROGRAM[dayName]?.subtitle || ''}${dur ? ' · ' + dur : ''}</div>${rows}${sessionVolHTML}</div>`;
+        const diff = meta && meta.difficulty ? (() => {
+          const d = meta.difficulty;
+          const cls = d <= 3 ? 'rpe-easy' : d <= 6 ? 'rpe-medium' : 'rpe-hard';
+          return '<span class="rpe-pip ' + cls + '">RPE ' + d + '</span>';
+        })() : '';
+        return `<div class="history-card"><div class="history-day-name">${dayName} — ${PROGRAM[dayName]?.subtitle || ''}${dur ? ' · ' + dur : ''}${diff}</div>${rows}${sessionVolHTML}</div>`;
       }).join("");
       return `<div class="history-block"><div class="history-date">${dateStr}</div>${cards}</div>`;
     }).join("");
