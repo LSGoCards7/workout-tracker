@@ -154,6 +154,30 @@
   .history-block { margin-bottom: 20px; }
   .progress-block { margin-bottom: 24px; }
 
+  /* ===== SETTINGS ===== */
+  .gear-btn { background: none; border: 1px solid #334155; border-radius: 8px; padding: 8px 10px; cursor: pointer; font-size: 18px; line-height: 1; }
+  .settings-section { margin-bottom: 28px; }
+  .settings-section-title { font-size: 12px; font-weight: 600; color: #64748b; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px; }
+  .settings-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #1e293b; }
+  .settings-row .info { flex: 1; }
+  .settings-row .info .title { font-size: 14px; color: #e2e8f0; font-weight: 600; }
+  .settings-row .info .sub { font-size: 11px; color: #64748b; margin-top: 2px; }
+  .settings-btn { background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; padding: 8px 16px; font-size: 12px; font-family: inherit; cursor: pointer; font-weight: 600; white-space: nowrap; }
+  .settings-btn:active { background: #334155; }
+  .settings-btn.primary { background: #4ade80; color: #0f172a; border-color: #4ade80; }
+  .settings-btn.primary:active { background: #22c55e; }
+  .settings-btn.danger { background: none; border-color: #7f1d1d; color: #f87171; }
+  .settings-btn.danger:active { background: #7f1d1d; }
+  .settings-stat { text-align: center; flex: 1; }
+  .settings-stat .num { font-size: 24px; font-weight: 700; color: #4ade80; }
+  .settings-stat .label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; }
+  .settings-stats { display: flex; gap: 12px; padding: 16px; background: #1e293b; border-radius: 10px; border: 1px solid #334155; margin-bottom: 8px; }
+  .backup-reminder { background: linear-gradient(135deg, #7c2d12 0%, #92400e 100%); border: 1px solid #b45309; border-radius: 10px; padding: 14px 16px; margin-bottom: 20px; cursor: pointer; display: flex; align-items: center; gap: 12px; }
+  .backup-reminder .msg { flex: 1; }
+  .backup-reminder .msg .title { font-size: 13px; font-weight: 700; color: #fed7aa; }
+  .backup-reminder .msg .sub { font-size: 11px; color: #fbbf24; margin-top: 2px; }
+  .backup-dismiss { background: none; border: none; color: #fed7aa; font-size: 18px; cursor: pointer; padding: 4px 8px; font-family: inherit; }
+
   /* ===== TABLET (768px+) ===== */
   @media (min-width: 768px) {
     #app { max-width: 720px; padding: 24px 32px 100px; }
@@ -269,7 +293,7 @@ const CHECKLIST_ITEMS = [
   "Logged every session with weight, reps, sets, and tempo",
 ];
 
-let state = { view: "home", activeDay: null, workoutData: {}, history: {}, checklist: {}, restTimer: null, restTimeLeft: 0, restInterval: null, restDuration: 0 };
+let state = { view: "home", activeDay: null, workoutData: {}, history: {}, checklist: {}, restTimer: null, restTimeLeft: 0, restInterval: null, restDuration: 0, lastExportDate: null, backupDismissDate: null };
 
 function getToday() { return new Date().toISOString().split("T")[0]; }
 function getDayName() { return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date().getDay()]; }
@@ -284,13 +308,29 @@ function getWeekId(d) {
 
 function loadData() {
   try {
-    const d = localStorage.getItem("ironlog-data");
-    if (d) { const p = JSON.parse(d); state.history = p.history || {}; state.checklist = p.checklist || {}; }
+    const raw = localStorage.getItem("ironlog-data");
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (!p.version) {
+      localStorage.setItem("ironlog-data-v1-backup", raw);
+      state.history = p.history || {};
+      state.checklist = p.checklist || {};
+      state.lastExportDate = null;
+      state.backupDismissDate = null;
+      saveData();
+    } else if (p.version === 2) {
+      state.history = p.history || {};
+      state.checklist = p.checklist || {};
+      state.lastExportDate = p.lastExportDate || null;
+      state.backupDismissDate = p.backupDismissDate || null;
+    } else {
+      console.warn("Unknown data version:", p.version);
+    }
   } catch(e) { console.log("No data yet"); }
 }
 
 function saveData() {
-  try { localStorage.setItem("ironlog-data", JSON.stringify({ history: state.history, checklist: state.checklist })); } catch(e) { console.error(e); }
+  try { localStorage.setItem("ironlog-data", JSON.stringify({ version: 2, history: state.history, checklist: state.checklist, lastExportDate: state.lastExportDate, backupDismissDate: state.backupDismissDate })); } catch(e) { console.error(e); }
 }
 
 function getLastVal(dayName, exIndex, field) {
@@ -362,8 +402,112 @@ function toggleChecklist(i) {
 
 function resetData() {
   if (confirm("This will permanently delete ALL workout history. Are you sure?")) {
-    localStorage.removeItem("ironlog-data"); state.history = {}; state.checklist = {}; render();
+    if (confirm("This CANNOT be undone. Export your data first if you want a backup. Proceed?")) {
+      localStorage.removeItem("ironlog-data"); state.history = {}; state.checklist = {}; state.lastExportDate = null; state.backupDismissDate = null; render();
+    }
   }
+}
+
+function getDataStats() {
+  const dates = Object.keys(state.history);
+  let exerciseEntries = 0;
+  dates.forEach(d => Object.values(state.history[d]).forEach(day => { exerciseEntries += Object.keys(day).length; }));
+  return { sessions: dates.length, exerciseEntries };
+}
+
+function buildExportPayload() {
+  const dates = Object.keys(state.history).sort();
+  return {
+    version: 2,
+    appVersion: "Iron Log v2",
+    exportDate: new Date().toISOString(),
+    totalSessions: dates.length,
+    dateRange: dates.length > 0 ? { earliest: dates[0], latest: dates[dates.length - 1] } : null,
+    history: state.history,
+    checklist: state.checklist,
+  };
+}
+
+function exportData() {
+  const payload = buildExportPayload();
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "ironlog-backup-" + getToday() + ".json";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  state.lastExportDate = new Date().toISOString();
+  saveData(); render();
+}
+
+function copyDataToClipboard() {
+  const payload = buildExportPayload();
+  try {
+    navigator.clipboard.writeText(JSON.stringify(payload, null, 2)).then(() => {
+      alert("Data copied to clipboard!");
+    }).catch(() => {
+      alert("Clipboard not available. Use the download option instead.");
+    });
+  } catch(e) {
+    alert("Clipboard not available. Use the download option instead.");
+  }
+}
+
+function importData() {
+  const input = document.createElement("input");
+  input.type = "file"; input.accept = ".json";
+  input.onchange = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const imported = JSON.parse(ev.target.result);
+        if (!imported.history || typeof imported.history !== "object") { alert("Invalid file: no history data found."); return; }
+        if (imported.version && imported.version > 2) { alert("This backup was created by a newer version of Iron Log. Please update the app first."); return; }
+        const importDates = Object.keys(imported.history);
+        const existingDates = Object.keys(state.history);
+        const overlap = importDates.filter(d => existingDates.includes(d));
+        const newDates = importDates.filter(d => !existingDates.includes(d));
+        const summary = `Import Summary:\n• ${importDates.length} total dates in file\n• ${newDates.length} new dates\n• ${overlap.length} overlapping dates\n\nProceed with import?`;
+        if (!confirm(summary)) return;
+        if (overlap.length > 0) {
+          if (confirm("Overlapping dates found. OK = Merge (import overwrites conflicts), Cancel = Replace all data")) {
+            overlap.forEach(d => { state.history[d] = { ...state.history[d], ...imported.history[d] }; });
+            newDates.forEach(d => { state.history[d] = imported.history[d]; });
+            if (imported.checklist) { Object.keys(imported.checklist).forEach(k => { state.checklist[k] = imported.checklist[k]; }); }
+          } else {
+            if (confirm("Replace ALL existing data with imported data? This cannot be undone.")) {
+              state.history = imported.history;
+              state.checklist = imported.checklist || {};
+            } else { return; }
+          }
+        } else {
+          newDates.forEach(d => { state.history[d] = imported.history[d]; });
+          if (imported.checklist) { Object.keys(imported.checklist).forEach(k => { state.checklist[k] = imported.checklist[k]; }); }
+        }
+        saveData(); render();
+        alert("Import complete!");
+      } catch(err) { alert("Failed to parse file. Make sure it's a valid Iron Log backup."); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function needsBackupReminder() {
+  if (Object.keys(state.history).length === 0) return false;
+  if (state.backupDismissDate) {
+    const dismissed = new Date(state.backupDismissDate);
+    if ((new Date() - dismissed) < 7 * 24 * 60 * 60 * 1000) return false;
+  }
+  if (!state.lastExportDate) return true;
+  return (new Date() - new Date(state.lastExportDate)) > 14 * 24 * 60 * 60 * 1000;
+}
+
+function dismissBackupReminder() {
+  state.backupDismissDate = new Date().toISOString();
+  saveData(); render();
 }
 
 function getProgressData(dayName, exIndex) {
@@ -410,12 +554,21 @@ function renderHome() {
     </button>`;
   }).join("");
 
+  let backupHTML = "";
+  if (needsBackupReminder()) {
+    backupHTML = `<div class="backup-reminder" onclick="state.view='settings';render()">
+      <div class="msg"><div class="title">Back up your data</div><div class="sub">Tap to export your workout history</div></div>
+      <button class="backup-dismiss" onclick="event.stopPropagation();dismissBackupReminder()">×</button>
+    </div>`;
+  }
+
   return `
     <div class="header">
       <div><h1>IRON LOG</h1><div class="sub">Dumbbell Hypertrophy Program</div></div>
-      <div class="week-badge"><span class="num">${ws}</span><span class="label">this week</span></div>
+      <div style="display:flex;gap:10px;align-items:flex-start"><div class="week-badge"><span class="num">${ws}</span><span class="label">this week</span></div><button class="gear-btn" onclick="state.view='settings';render()">⚙</button></div>
     </div>
     ${todayHTML}
+    ${backupHTML}
     <div class="section"><div class="section-title">All Workouts</div><div class="day-grid">${dayCards}</div></div>
     <div class="section"><div class="section-title">Weekly Checklist</div>${checklistHTML}<div class="checklist-score">${checked.length}/5 this week</div></div>
     <div class="nav-bar">
@@ -504,8 +657,7 @@ function renderHistory() {
       <button class="btn-outline" onclick="state.view='home';render()">← Back</button>
       <span class="page-title">History</span><div style="width:60px"></div>
     </div>
-    ${content}
-    <button class="btn-reset" onclick="resetData()">Reset All Data</button>`;
+    ${content}`;
 }
 
 function renderProgress() {
@@ -546,6 +698,49 @@ function renderProgress() {
     ${content}`;
 }
 
+function renderSettings() {
+  const stats = getDataStats();
+  const lastExport = state.lastExportDate ? new Date(state.lastExportDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Never";
+
+  return `
+    <div class="nav-row">
+      <button class="btn-outline" onclick="state.view='home';render()">← Back</button>
+      <span class="page-title">Settings</span><div style="width:60px"></div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">Data Summary</div>
+      <div class="settings-stats">
+        <div class="settings-stat"><div class="num">${stats.sessions}</div><div class="label">Sessions</div></div>
+        <div class="settings-stat"><div class="num">${stats.exerciseEntries}</div><div class="label">Exercises</div></div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">Export</div>
+      <div class="settings-row">
+        <div class="info"><div class="title">Download Backup</div><div class="sub">Last export: ${esc(lastExport)}</div></div>
+        <button class="settings-btn primary" onclick="exportData()">Download</button>
+      </div>
+      <div class="settings-row">
+        <div class="info"><div class="title">Copy to Clipboard</div><div class="sub">Copy JSON data to clipboard</div></div>
+        <button class="settings-btn" onclick="copyDataToClipboard()">Copy</button>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">Import</div>
+      <div class="settings-row">
+        <div class="info"><div class="title">Import Backup</div><div class="sub">Load a previously exported JSON file</div></div>
+        <button class="settings-btn" onclick="importData()">Import</button>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">Danger Zone</div>
+      <div class="settings-row">
+        <div class="info"><div class="title" style="color:#f87171">Reset All Data</div><div class="sub">Permanently delete all workout history</div></div>
+        <button class="settings-btn danger" onclick="resetData()">Reset</button>
+      </div>
+    </div>`;
+}
+
 function render() {
   const app = document.getElementById("app");
   switch (state.view) {
@@ -553,6 +748,7 @@ function render() {
     case "workout": app.innerHTML = renderWorkout(); break;
     case "history": app.innerHTML = renderHistory(); break;
     case "progress": app.innerHTML = renderProgress(); break;
+    case "settings": app.innerHTML = renderSettings(); break;
   }
 }
 
