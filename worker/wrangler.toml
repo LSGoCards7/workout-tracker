@@ -1,0 +1,7 @@
+name = "ironlog-sync"
+main = "src/index.js"
+compatibility_date = "2024-12-01"
+
+[[kv_namespaces]]
+binding = "IRONLOG_DATA"
+id = "YOUR_KV_NAMESPACE_ID"

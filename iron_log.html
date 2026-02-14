@@ -6,6 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Iron Log">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>IRON LOG</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap');
@@ -178,6 +180,32 @@
   .backup-reminder .msg .sub { font-size: 11px; color: #fbbf24; margin-top: 2px; }
   .backup-dismiss { background: none; border: none; color: #fed7aa; font-size: 18px; cursor: pointer; padding: 4px 8px; font-family: inherit; }
 
+  /* ===== FILE PROTOCOL BANNER ===== */
+  .file-banner { background: #92400e; color: #fef3c7; padding: 10px 16px; font-size: 12px; text-align: center; line-height: 1.4; }
+  .file-banner a { color: #fbbf24; font-weight: 700; }
+
+  /* ===== TOAST ===== */
+  #toast { position: fixed; top: -60px; left: 50%; transform: translateX(-50%); z-index: 200; transition: top 0.3s ease; pointer-events: none; }
+  #toast.show { top: 12px; }
+  .toast-pill { background: rgba(30,41,59,0.95); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid #334155; border-radius: 8px; padding: 10px 20px; font-size: 12px; font-weight: 600; color: #e2e8f0; white-space: nowrap; }
+  .toast-pill.success { border-color: #22543d; color: #4ade80; }
+  .toast-pill.error { border-color: #7f1d1d; color: #f87171; }
+
+  /* ===== SYNC STATUS ===== */
+  .sync-key-input { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; padding: 10px 12px; font-size: 13px; font-family: inherit; }
+  .sync-key-input::placeholder { color: #475569; }
+  .sync-key-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .sync-key-row input { flex: 1; }
+  .sync-status-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 12px; }
+  .sync-status-badge.synced { background: #14532d; color: #4ade80; }
+  .sync-status-badge.syncing { background: #1e3a5f; color: #60a5fa; }
+  .sync-status-badge.offline { background: #3f3f46; color: #a1a1aa; }
+  .sync-status-badge.error { background: #450a0a; color: #f87171; }
+  .sync-status-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .sync-status-badge.syncing .dot { animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .sync-meta { font-size: 11px; color: #64748b; margin-top: 6px; }
+
   /* ===== TABLET (768px+) ===== */
   @media (min-width: 768px) {
     #app { max-width: 720px; padding: 24px 32px 100px; }
@@ -225,10 +253,16 @@
 </style>
 </head>
 <body>
+<div id="file-banner"></div>
 <div id="app"></div>
 <div id="rest-timer"></div>
+<div id="toast"></div>
 
 <script>
+// ===== SYNC CONFIG =====
+const SYNC_WORKER_URL = ''; // Set after deploying Cloudflare Worker, e.g. 'https://ironlog-sync.YOUR_USER.workers.dev'
+const SYNC_DEBOUNCE_MS = 5000;
+
 const PROGRAM = {
   "Lower A": {
     subtitle: "Quad Focus",
@@ -293,7 +327,8 @@ const CHECKLIST_ITEMS = [
   "Logged every session with weight, reps, sets, and tempo",
 ];
 
-let state = { view: "home", activeDay: null, workoutData: {}, history: {}, checklist: {}, restTimer: null, restTimeLeft: 0, restInterval: null, restDuration: 0, lastExportDate: null, backupDismissDate: null };
+let state = { view: "home", activeDay: null, workoutData: {}, history: {}, checklist: {}, restTimer: null, restTimeLeft: 0, restInterval: null, restDuration: 0, lastExportDate: null, backupDismissDate: null, syncKey: null, syncEnabled: true, lastSyncedAt: null, syncStatus: 'idle', needsSync: false };
+let syncDebounceTimer = null;
 
 function getToday() { return new Date().toISOString().split("T")[0]; }
 function getDayName() { return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date().getDay()]; }
@@ -309,7 +344,20 @@ function getWeekId(d) {
 function loadData() {
   try {
     const raw = localStorage.getItem("ironlog-data");
-    if (!raw) return;
+    if (!raw) {
+      // Try IndexedDB fallback
+      loadFromIDB().then(idbData => {
+        if (idbData) {
+          state.history = idbData.history || {};
+          state.checklist = idbData.checklist || {};
+          state.lastExportDate = idbData.lastExportDate || null;
+          state.backupDismissDate = idbData.backupDismissDate || null;
+          saveData(); render();
+          showToast('Recovered data from backup', 'success');
+        }
+      });
+      return;
+    }
     const p = JSON.parse(raw);
     if (!p.version) {
       localStorage.setItem("ironlog-data-v1-backup", raw);
@@ -327,10 +375,27 @@ function loadData() {
       console.warn("Unknown data version:", p.version);
     }
   } catch(e) { console.log("No data yet"); }
+  // Load sync settings
+  try {
+    const sync = localStorage.getItem("ironlog-sync");
+    if (sync) {
+      const s = JSON.parse(sync);
+      state.syncKey = s.syncKey || null;
+      state.syncEnabled = s.syncEnabled !== false;
+      state.lastSyncedAt = s.lastSyncedAt || null;
+    }
+  } catch(e) { /* no sync config */ }
 }
 
 function saveData() {
-  try { localStorage.setItem("ironlog-data", JSON.stringify({ version: 2, history: state.history, checklist: state.checklist, lastExportDate: state.lastExportDate, backupDismissDate: state.backupDismissDate })); } catch(e) { console.error(e); }
+  const payload = { version: 2, history: state.history, checklist: state.checklist, lastExportDate: state.lastExportDate, backupDismissDate: state.backupDismissDate };
+  try { localStorage.setItem("ironlog-data", JSON.stringify(payload)); } catch(e) { console.error(e); showToast('Storage full — backup only', 'error'); }
+  saveToIDB(payload);
+  debouncedSync();
+}
+
+function saveSyncSettings() {
+  try { localStorage.setItem("ironlog-sync", JSON.stringify({ syncKey: state.syncKey, syncEnabled: state.syncEnabled, lastSyncedAt: state.lastSyncedAt })); } catch(e) { /* */ }
 }
 
 function getLastVal(dayName, exIndex, field) {
@@ -400,13 +465,6 @@ function toggleChecklist(i) {
   saveData(); render();
 }
 
-function resetData() {
-  if (confirm("This will permanently delete ALL workout history. Are you sure?")) {
-    if (confirm("This CANNOT be undone. Export your data first if you want a backup. Proceed?")) {
-      localStorage.removeItem("ironlog-data"); state.history = {}; state.checklist = {}; state.lastExportDate = null; state.backupDismissDate = null; render();
-    }
-  }
-}
 
 function getDataStats() {
   const dates = Object.keys(state.history);
@@ -495,15 +553,6 @@ function importData() {
   input.click();
 }
 
-function needsBackupReminder() {
-  if (Object.keys(state.history).length === 0) return false;
-  if (state.backupDismissDate) {
-    const dismissed = new Date(state.backupDismissDate);
-    if ((new Date() - dismissed) < 7 * 24 * 60 * 60 * 1000) return false;
-  }
-  if (!state.lastExportDate) return true;
-  return (new Date() - new Date(state.lastExportDate)) > 14 * 24 * 60 * 60 * 1000;
-}
 
 function dismissBackupReminder() {
   state.backupDismissDate = new Date().toISOString();
@@ -517,6 +566,200 @@ function getProgressData(dayName, exIndex) {
     if (ex) { entries.push({ date, weight: ex.weight, totalReps: ex.sets.reduce((s,x) => s + (x.reps||0), 0), technique: ex.technique, numSets: ex.sets.length }); }
   });
   return entries;
+}
+
+// ===== INDEXEDDB BACKUP =====
+function openIDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('ironlog-backup', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('data');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function saveToIDB(data) {
+  openIDB().then(db => {
+    const tx = db.transaction('data', 'readwrite');
+    tx.objectStore('data').put(data, 'current');
+  }).catch(() => { /* IDB unavailable — localStorage is primary */ });
+}
+
+function loadFromIDB() {
+  return openIDB().then(db => {
+    return new Promise((resolve) => {
+      const tx = db.transaction('data', 'readonly');
+      const req = tx.objectStore('data').get('current');
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  }).catch(() => null);
+}
+
+// ===== TOAST =====
+let toastTimer = null;
+function showToast(message, type) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  const pill = document.createElement('div');
+  pill.className = 'toast-pill ' + (type || '');
+  pill.textContent = message;
+  el.replaceChildren(pill);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.classList.remove('show'); }, 2500);
+}
+
+// ===== CLOUD SYNC =====
+function canSync() {
+  return SYNC_WORKER_URL && state.syncKey && state.syncKey.length >= 8 && state.syncEnabled;
+}
+
+function debouncedSync() {
+  if (!canSync() || state.syncStatus === 'syncing') return;
+  clearTimeout(syncDebounceTimer);
+  syncDebounceTimer = setTimeout(() => syncToCloud(), SYNC_DEBOUNCE_MS);
+}
+
+async function syncToCloud() {
+  if (!canSync() || !navigator.onLine) {
+    state.needsSync = true;
+    state.syncStatus = navigator.onLine ? 'idle' : 'offline';
+    return;
+  }
+  state.syncStatus = 'syncing';
+  if (state.view === 'settings') render();
+
+  try {
+    const payload = { version: 2, history: state.history, checklist: state.checklist, lastExportDate: state.lastExportDate, backupDismissDate: state.backupDismissDate };
+    const resp = await fetch(SYNC_WORKER_URL + '/sync?key=' + encodeURIComponent(state.syncKey), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || 'HTTP ' + resp.status);
+    }
+
+    const result = await resp.json();
+    state.lastSyncedAt = result.serverUpdatedAt || new Date().toISOString();
+    state.syncStatus = 'synced';
+    state.needsSync = false;
+    saveSyncSettings();
+    showToast('Synced', 'success');
+  } catch (e) {
+    console.error('Sync push failed:', e);
+    state.syncStatus = 'error';
+    state.needsSync = true;
+    showToast('Sync failed — will retry', 'error');
+  }
+  if (state.view === 'settings') render();
+}
+
+async function pullFromCloud() {
+  if (!canSync() || !navigator.onLine) return;
+  state.syncStatus = 'syncing';
+  if (state.view === 'settings') render();
+
+  try {
+    const resp = await fetch(SYNC_WORKER_URL + '/sync?key=' + encodeURIComponent(state.syncKey));
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const result = await resp.json();
+
+    if (!result.exists) {
+      // No cloud data — push local to create it
+      await syncToCloud();
+      return;
+    }
+
+    const cloud = result.data;
+    const localDates = Object.keys(state.history);
+    const isLocalEmpty = localDates.length === 0;
+    const isFirstSync = !state.lastSyncedAt;
+
+    if (isFirstSync && !isLocalEmpty) {
+      // Both have data on first sync — ask user
+      const cloudDates = Object.keys(cloud.history || {});
+      if (cloudDates.length > 0) {
+        const choice = confirm('Found ' + cloudDates.length + ' session(s) in cloud and ' + localDates.length + ' locally.\n\nOK = Load cloud data\nCancel = Keep this device\'s data and push to cloud');
+        if (choice) {
+          applyCloudData(cloud);
+        } else {
+          await syncToCloud();
+        }
+        return;
+      }
+    }
+
+    if (isLocalEmpty && result.exists) {
+      // New device — pull cloud data
+      applyCloudData(cloud);
+      showToast('Loaded data from cloud', 'success');
+      return;
+    }
+
+    // Normal sync — compare timestamps
+    if (state.lastSyncedAt && result.serverUpdatedAt > state.lastSyncedAt) {
+      applyCloudData(cloud);
+    } else {
+      // Local is same or newer — push
+      await syncToCloud();
+    }
+  } catch (e) {
+    console.error('Sync pull failed:', e);
+    state.syncStatus = 'error';
+    showToast('Sync failed', 'error');
+  }
+  if (state.view === 'settings') render();
+}
+
+function applyCloudData(cloud) {
+  state.history = cloud.history || {};
+  state.checklist = cloud.checklist || {};
+  state.lastExportDate = cloud.lastExportDate || state.lastExportDate;
+  state.backupDismissDate = cloud.backupDismissDate || state.backupDismissDate;
+  state.lastSyncedAt = new Date().toISOString();
+  state.syncStatus = 'synced';
+  state.needsSync = false;
+  saveData();
+  saveSyncSettings();
+  render();
+}
+
+function setSyncKey(key) {
+  if (key && key.length < 8) {
+    showToast('Key must be at least 8 characters', 'error');
+    return;
+  }
+  if (state.syncKey && key !== state.syncKey) {
+    if (!confirm('Changing your sync key will disconnect from your existing cloud data. Continue?')) return;
+  }
+  state.syncKey = key || null;
+  state.lastSyncedAt = null;
+  saveSyncSettings();
+  if (key) pullFromCloud();
+  render();
+}
+
+function toggleSync() {
+  state.syncEnabled = !state.syncEnabled;
+  saveSyncSettings();
+  if (state.syncEnabled && canSync()) pullFromCloud();
+  render();
+}
+
+function formatTimeAgo(isoStr) {
+  if (!isoStr) return 'Never';
+  const diff = Date.now() - new Date(isoStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return mins + 'm ago';
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return hours + 'h ago';
+  const days = Math.floor(hours / 24);
+  return days + 'd ago';
 }
 
 function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
@@ -702,6 +945,50 @@ function renderSettings() {
   const stats = getDataStats();
   const lastExport = state.lastExportDate ? new Date(state.lastExportDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Never";
 
+  // Sync section
+  let syncHTML = '';
+  if (!SYNC_WORKER_URL) {
+    syncHTML = '<div class="settings-section"><div class="settings-section-title">Cloud Sync</div><div class="settings-row"><div class="info"><div class="title" style="color:#64748b">Not configured</div><div class="sub">Set SYNC_WORKER_URL to enable cloud sync</div></div></div></div>';
+  } else if (!state.syncKey) {
+    syncHTML = `<div class="settings-section">
+      <div class="settings-section-title">Cloud Sync</div>
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px">
+        <div style="font-size:13px;color:#e2e8f0;font-weight:600;margin-bottom:4px">Set up sync</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:12px">Enter a passphrase to sync across devices. Use the same key on all devices.</div>
+        <div class="sync-key-row">
+          <input class="sync-key-input" id="sync-key-input" type="password" placeholder="Enter sync key (min 8 chars)" minlength="8">
+          <button class="settings-btn primary" onclick="setSyncKey(document.getElementById('sync-key-input').value)">Save</button>
+        </div>
+      </div>
+    </div>`;
+  } else {
+    const statusClass = state.syncStatus === 'synced' ? 'synced' : state.syncStatus === 'syncing' ? 'syncing' : state.syncStatus === 'error' ? 'error' : state.syncStatus === 'offline' ? 'offline' : 'synced';
+    const statusLabel = state.syncStatus === 'synced' ? 'Synced' : state.syncStatus === 'syncing' ? 'Syncing...' : state.syncStatus === 'error' ? 'Error' : state.syncStatus === 'offline' ? 'Offline' : 'Ready';
+    syncHTML = `<div class="settings-section">
+      <div class="settings-section-title">Cloud Sync</div>
+      <div class="settings-row">
+        <div class="info">
+          <div class="title">Status</div>
+          <div style="margin-top:6px"><span class="sync-status-badge ${statusClass}"><span class="dot"></span>${esc(statusLabel)}</span></div>
+          <div class="sync-meta">Last synced: ${esc(formatTimeAgo(state.lastSyncedAt))}</div>
+        </div>
+        <button class="settings-btn primary" onclick="pullFromCloud()">Sync Now</button>
+      </div>
+      <div class="settings-row">
+        <div class="info"><div class="title">Sync Key</div><div class="sub" id="sync-key-display" style="font-family:monospace">${state.syncKey ? '••••••••' : 'Not set'}</div></div>
+        <button class="settings-btn" onclick="const el=document.getElementById('sync-key-display');el.textContent=el.textContent==='••••••••'?state.syncKey:'••••••••'">Show</button>
+      </div>
+      <div class="settings-row">
+        <div class="info"><div class="title">Change Sync Key</div><div class="sub">Disconnect and use a different key</div></div>
+        <button class="settings-btn" onclick="setSyncKey(prompt('Enter new sync key (min 8 chars):'))">Change</button>
+      </div>
+      <div class="settings-row">
+        <div class="info"><div class="title">${state.syncEnabled ? 'Sync Enabled' : 'Sync Disabled'}</div><div class="sub">Toggle automatic cloud sync</div></div>
+        <button class="settings-btn${state.syncEnabled ? '' : ' primary'}" onclick="toggleSync()">${state.syncEnabled ? 'Disable' : 'Enable'}</button>
+      </div>
+    </div>`;
+  }
+
   return `
     <div class="nav-row">
       <button class="btn-outline" onclick="state.view='home';render()">← Back</button>
@@ -714,6 +1001,7 @@ function renderSettings() {
         <div class="settings-stat"><div class="num">${stats.exerciseEntries}</div><div class="label">Exercises</div></div>
       </div>
     </div>
+    ${syncHTML}
     <div class="settings-section">
       <div class="settings-section-title">Export</div>
       <div class="settings-row">
@@ -730,6 +1018,13 @@ function renderSettings() {
       <div class="settings-row">
         <div class="info"><div class="title">Import Backup</div><div class="sub">Load a previously exported JSON file</div></div>
         <button class="settings-btn" onclick="importData()">Import</button>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">App</div>
+      <div class="settings-row">
+        <div class="info"><div class="title">Check for Updates</div><div class="sub">Check if a new version is available</div></div>
+        <button class="settings-btn" onclick="checkForUpdates()">Check</button>
       </div>
     </div>
     <div class="settings-section">
@@ -752,8 +1047,100 @@ function render() {
   }
 }
 
+// ===== BACKUP REMINDER (cloud-aware) =====
+function needsBackupReminder() {
+  if (Object.keys(state.history).length === 0) return false;
+  // If cloud sync active and recent, suppress reminder
+  if (canSync() && state.lastSyncedAt) {
+    const sinceLast = Date.now() - new Date(state.lastSyncedAt).getTime();
+    if (sinceLast < 24 * 60 * 60 * 1000) return false;
+    // Sync stalled — show different warning (handled in render)
+  }
+  if (state.backupDismissDate) {
+    const dismissed = new Date(state.backupDismissDate);
+    if ((new Date() - dismissed) < 7 * 24 * 60 * 60 * 1000) return false;
+  }
+  if (!state.lastExportDate) return true;
+  return (new Date() - new Date(state.lastExportDate)) > 14 * 24 * 60 * 60 * 1000;
+}
+
+// ===== AUTO-EXPORT BEFORE RESET =====
+function resetData() {
+  if (confirm("This will permanently delete ALL workout history. Are you sure?")) {
+    if (confirm("This CANNOT be undone. A backup will be downloaded first. Proceed?")) {
+      exportData(); // Auto-download backup
+      localStorage.removeItem("ironlog-data"); state.history = {}; state.checklist = {}; state.lastExportDate = null; state.backupDismissDate = null; render();
+    }
+  }
+}
+
+// ===== SERVICE WORKER UPDATE CHECK =====
+function checkForUpdates() {
+  if (!('serviceWorker' in navigator)) {
+    showToast('Service worker not supported', 'error');
+    return;
+  }
+  navigator.serviceWorker.getRegistration().then(reg => {
+    if (!reg) { showToast('No service worker registered', 'error'); return; }
+    reg.update().then(() => {
+      if (reg.waiting) {
+        showToast('Update available — reloading...', 'success');
+        setTimeout(() => location.reload(), 1000);
+      } else {
+        showToast('Already up to date', 'success');
+      }
+    });
+  }).catch(() => showToast('Update check failed', 'error'));
+}
+
+// ===== FILE PROTOCOL BANNER =====
+function checkFileProtocol() {
+  if (location.protocol === 'file:') {
+    const banner = document.getElementById('file-banner');
+    if (banner) {
+      banner.className = 'file-banner';
+      banner.textContent = 'You\'re viewing the local file. For sync and offline support, use the hosted version.';
+    }
+  }
+}
+
+// ===== ONLINE/OFFLINE LISTENERS =====
+window.addEventListener('online', () => {
+  if (state.needsSync && canSync()) syncToCloud();
+  showToast('Back online', 'success');
+});
+
+window.addEventListener('offline', () => {
+  state.syncStatus = 'offline';
+  showToast('Offline — changes saved locally', '');
+});
+
+// ===== SERVICE WORKER REGISTRATION =====
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    // Listen for new SW waiting
+    reg.addEventListener('updatefound', () => {
+      const newSW = reg.installing;
+      if (newSW) {
+        newSW.addEventListener('statechange', () => {
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            showToast('Update available — check Settings', 'success');
+          }
+        });
+      }
+    });
+  }).catch(err => console.error('SW registration failed:', err));
+}
+
+// ===== STARTUP =====
 loadData();
 render();
+checkFileProtocol();
+
+// Initial cloud pull (on startup, if configured)
+if (canSync() && navigator.onLine) {
+  setTimeout(() => pullFromCloud(), 500);
+}
 </script>
 </body>
 </html>
