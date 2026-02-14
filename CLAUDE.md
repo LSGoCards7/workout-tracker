@@ -21,18 +21,22 @@ The file is organized in order: `<style>` → `<div id="app">` → `<nav>` → `
 - Global `state` object tracks current view, selected workout, active exercise, etc.
 - `render()` function reads `state` and rebuilds `#app` innerHTML
 - Navigation between views: update `state.view` then call `render()`
-- Views: `home`, `workout`, `history`, `progress`
+- Views: `home`, `workout`, `history`, `progress`, `settings`
+- `renderTimer()` updates `#rest-timer` independently (fixed overlay, outside `#app`)
 
 ### Data persistence
 - All data stored in browser LocalStorage under key `ironlog-data`
-- `save()` writes to LocalStorage; `load()` reads on startup
+- v2 format: `{ version: 2, history, checklist, lastExportDate, backupDismissDate }`
+- Auto-migration from v1 (no version field) with safety backup to `ironlog-data-v1-backup`
+- `saveData()` writes to LocalStorage; `loadData()` reads on startup
+- Export/import JSON with merge vs replace flow
 - Data shape:
   - `history["YYYY-MM-DD"]["Day Name"][exerciseIndex]` → `{ weight, technique, sets: [{reps, completed}], notes }`
   - `checklist["YYYY-Www"][itemIndex]` → completed item indices
 
 ### Program structure
 - 5-day dumbbell split: Lower A, Upper A, Lower B, Upper B, Day 5
-- Weekly schedule: Mon/Tue/Thu/Fri workout days, Wed/Sat/Sun rest
+- Weekly schedule: Sat/Sun/Tue/Thu/Fri workout days, Mon/Wed rest
 - Exercises defined in `PROGRAM` array with name, sets, rep range, default weight, tempo, rest time
 - Techniques: standard, dropset, myorep, superset, slow eccentric
 
@@ -40,6 +44,7 @@ The file is organized in order: `<style>` → `<div id="app">` → `<nav>` → `
 - Dark theme: background `#0f172a`, text `#e2e8f0`, accent `#4ade80`
 - JetBrains Mono font throughout
 - Mobile-first, max-width 480px, fixed bottom nav bar
+- Responsive breakpoints: 768px (tablet, 720px max), 1200px (desktop, 1000px max)
 - iOS PWA meta tags for home screen installation
 
 ## Session Continuity
