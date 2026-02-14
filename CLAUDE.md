@@ -19,7 +19,7 @@ IRON LOG — a dumbbell hypertrophy workout tracking PWA. The core application i
 ### File structure
 | File | Purpose |
 |------|---------|
-| `iron_log.html` | The entire app — CSS, HTML, JS inline (~1280 lines) |
+| `iron_log.html` | The entire app — CSS, HTML, JS inline (~1590 lines) |
 | `sw.js` | Service worker — cache-first for app shell, skip sync URLs |
 | `manifest.json` | PWA metadata — name, icons, theme, display mode |
 | `icons/` | PWA icons (192, 512 PNG + apple-touch-icon 180) |
@@ -45,6 +45,25 @@ Organized in order: FOUC `<script>` → `<style>` → `<div id="file-banner">` �
 - `<title>` tooltips on data points (desktop hover only; no touch support yet)
 - No callers yet — first consumer will be Exercise Progression Charts
 
+### Volume & progression utilities
+- `calcExVolume(exercise)` — sum of `reps * weight` for completed sets only. Returns 0 if no sets or weight is 0.
+- `calcSessionVolume(exerciseData)` — sum of all exercise volumes in a session. Skips `__meta` key.
+- `isReadyToProgress(exIndex)` — returns true if all sets completed AND all reps >= `repsHigh`. Used by overload badge in workout view.
+- Progressive overload badge: shown below notes input when `isReadyToProgress()` is true. Suggests +5 lbs or harder technique at max weight (50 lbs).
+
+### Session duration
+- `state.workoutStartTime` tracks when workout started (epoch ms)
+- `startWorkout()` sets start time (fresh `Date.now()` or restored from `__meta.startTime` for crash recovery)
+- `completeSet()` persists `__meta.startTime` to history for crash resilience
+- `finishWorkout()` computes `__meta.duration` (seconds), deletes `__meta.startTime`
+- `loadData()` cleans up orphaned `startTime` entries (crash without finish)
+- Duration displayed in History view card headers (e.g., "Lower A — Quad Focus · 47 min")
+
+### Rest timer auto-start
+- **localStorage key**: `ironlog-autorest` — `'false'` to disable, absent/any other value = enabled (default ON)
+- `completeSet()` conditionally calls `startRest()` based on setting. Skips last set of last exercise.
+- Settings toggle in Settings → Workout section
+
 ### Data persistence
 - **Primary**: LocalStorage under key `ironlog-data`
 - **Backup**: IndexedDB (`ironlog-backup` database) — fire-and-forget write on every save, fallback read if localStorage empty
@@ -56,6 +75,7 @@ Organized in order: FOUC `<script>` → `<style>` → `<div id="file-banner">` �
 - Export/import JSON with merge vs replace flow
 - Data shape:
   - `history["YYYY-MM-DD"]["Day Name"][exerciseIndex]` → `{ weight, technique, sets: [{reps, completed}], notes }`
+  - `history["YYYY-MM-DD"]["__meta"]` → `{ startTime?, duration? }` — session metadata. `startTime` is ephemeral (deleted on finish), `duration` is permanent (seconds). Reserved key — all history iteration must filter it.
   - `checklist["YYYY-Www"][itemIndex]` → completed item indices
 
 ### Cloud sync architecture
@@ -68,7 +88,7 @@ Organized in order: FOUC `<script>` → `<style>` → `<div id="file-banner">` �
 - **Offline**: Sets `needsSync=true`, syncs on `online` event
 
 ### Service worker (`sw.js`)
-- **Cache name**: `ironlog-cache-v1` (bump version to force update)
+- **Cache name**: `ironlog-cache-v2` (bump version to force update)
 - **Strategy**: Cache-first for app shell + fonts. Network-first for sync URLs (never cached)
 - **Activation**: `skipWaiting()` + `clients.claim()` for immediate takeover
 - **Update**: "Check for Updates" button in Settings calls `registration.update()`
