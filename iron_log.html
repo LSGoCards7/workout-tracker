@@ -582,6 +582,7 @@ function loadData() {
   for (const date in state.history) {
     for (const day in state.history[date]) {
       if (day === '__meta') continue;
+      if (!Array.isArray(state.history[date][day])) continue;
       state.history[date][day].forEach(ex => {
         if (typeof ex.weight === 'number' && ex.weight % 5 !== 0) {
           const old = ex.weight;
