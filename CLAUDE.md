@@ -125,10 +125,10 @@ Organized in order: FOUC `<script>` → `<style>` → `<div id="file-banner">` �
 - **Escape hatch**: Unregister via devtools → Application → Service Workers → Unregister
 
 ### Program structure
-- 5-day dumbbell split: Lower A, Upper A, Lower B, Upper B, Day 5
-- Weekly schedule: Sat/Sun/Tue/Thu/Fri workout days, Mon/Wed rest
-- Exercises defined in `PROGRAM` array with name, sets, rep range, default weight, tempo, rest time
-- Techniques: standard, dropset, myorep, superset, slow eccentric
+- 4-day upper/lower dumbbell split: Upper 1, Lower 1, Upper 2, Lower 2
+- Weekly schedule: Sat/Sun/Tue/Thu workout days, Mon/Wed/Fri rest
+- Exercises defined in `PROGRAM` object with name, sets, rep range, default weight, tempo, rest time
+- Techniques: standard, 1.5 reps, pause reps, rest-pause, mech. drop set, slow tempo
 
 ### Theming
 - **CSS custom properties**: All colors defined as variables in `[data-theme="dark"]` and `[data-theme="light"]` blocks

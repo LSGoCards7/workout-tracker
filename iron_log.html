@@ -468,64 +468,55 @@ window.addEventListener('storage', (e) => {
   }
 });
 
+// Program swapped 2026-02-15: 5-day split → 4-day upper/lower
 const PROGRAM = {
-  "Lower A": {
+  "Upper 1": {
+    subtitle: "Press & Pull",
+    exercises: [
+      { name: "Flat Dumbbell Press", sets: 4, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 40, note: "", rest: 90 },
+      { name: "Seated Dumbbell Shoulder Press", sets: 3, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 30, note: "", rest: 90 },
+      { name: "DB Chest Supported Row", sets: 4, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 35, note: "Emphasize upper back squeeze", rest: 90 },
+      { name: "Lean-In Lateral Raise", sets: 3, repsLow: 10, repsHigh: 20, tempo: "Controlled", defaultWeight: 15, note: "Per side. Lean away from anchor for stretch", rest: 60 },
+      { name: "DB Overhead Tricep Extensions", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 35, note: "Two-handed or single arm", rest: 60 },
+    ],
+  },
+  "Lower 1": {
     subtitle: "Quad Focus",
     exercises: [
-      { name: "Bulgarian Split Squat", sets: 4, repsLow: 8, repsHigh: 10, tempo: "3-1-1-0", defaultWeight: 45, note: "Each leg. Front foot elevated if possible.", rest: 90 },
-      { name: "Goblet Squat (1.5 rep)", sets: 3, repsLow: 8, repsHigh: 10, tempo: "Controlled", defaultWeight: 50, note: "Down, halfway up, back down, all the way up = 1 rep.", rest: 90 },
-      { name: "DB Walking Lunge", sets: 3, repsLow: 12, repsHigh: 12, tempo: "Controlled", defaultWeight: 40, note: "Each leg. Long stride, upright torso.", rest: 60 },
-      { name: "Single Leg DB RDL", sets: 3, repsLow: 10, repsHigh: 12, tempo: "3-0-1-1", defaultWeight: 40, note: "Each leg. Squeeze glute at top.", rest: 60 },
-      { name: "Single Leg Calf Raise", sets: 3, repsLow: 15, repsHigh: 20, tempo: "2-1-1-1", defaultWeight: 45, note: "Each leg. Stand on step edge.", rest: 60 },
+      { name: "Bulgarian Split Squat (Quad Focused)", sets: 3, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 35, note: "Per side. Upright torso, front-foot emphasis", rest: 90 },
+      { name: "Dumbbell Romanian Deadlift", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 40, note: "Hinge pattern, hamstring stretch", rest: 90 },
+      { name: "Heel Elevated Goblet Squat", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 40, note: "Elevate heels on plate or book for quad bias", rest: 90 },
+      { name: "Single Leg Weighted Calf Raise", sets: 3, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 35, note: "Per side. Superset with Dead Bug", rest: 60 },
+      { name: "Dead Bug", sets: 1, repsLow: 5, repsHigh: 10, tempo: "Controlled", defaultWeight: 0, note: "Core stability. Superset with Calf Raises", rest: 60 },
     ],
   },
-  "Upper A": {
-    subtitle: "Push Focus",
+  "Upper 2": {
+    subtitle: "Incline & Arms",
     exercises: [
-      { name: "DB Floor Press", sets: 4, repsLow: 8, repsHigh: 10, tempo: "3-2-1-0", defaultWeight: 50, note: "2-sec pause at bottom eliminates stretch reflex.", rest: 90 },
-      { name: "Incline DB Press", sets: 3, repsLow: 10, repsHigh: 12, tempo: "3-1-1-0", defaultWeight: 40, note: "Use angled surface or propped pillows.", rest: 90 },
-      { name: "Seated OH Press (wall)", sets: 3, repsLow: 8, repsHigh: 10, tempo: "3-1-1-0", defaultWeight: 40, note: "Back against wall. No leaning.", rest: 90 },
-      { name: "Lateral Raise", sets: 3, repsLow: 12, repsHigh: 15, tempo: "2-1-2-0", defaultWeight: 15, note: "Slow up AND down. No swinging.", rest: 60 },
-      { name: "OH Tricep Extension", sets: 3, repsLow: 10, repsHigh: 12, tempo: "3-1-1-0", defaultWeight: 45, note: "Both arms, single DB.", rest: 60 },
+      { name: "Low Incline Dumbbell Press", sets: 4, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 40, note: "~30° incline for upper chest emphasis", rest: 90 },
+      { name: "3-Point Dumbbell Row", sets: 4, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 40, note: "Per side. One hand on bench", rest: 90 },
+      { name: "Dumbbell Lateral Raises", sets: 3, repsLow: 10, repsHigh: 20, tempo: "Controlled", defaultWeight: 15, note: "Superset with Incline Overhead Extensions", rest: 60 },
+      { name: "Incline DB Overhead Extensions", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 30, note: "Lying on incline bench. Superset with Lateral Raises", rest: 60 },
+      { name: "Prone Arm Circles (Weighted)", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 5, note: "Light weight. Rear delt / rotator cuff health", rest: 60 },
     ],
   },
-  "Lower B": {
-    subtitle: "Hinge Focus",
+  "Lower 2": {
+    subtitle: "Glute Focus",
     exercises: [
-      { name: "DB Romanian Deadlift", sets: 4, repsLow: 8, repsHigh: 10, tempo: "4-1-1-1", defaultWeight: 50, note: "4-sec lowering. Feel hamstring stretch.", rest: 90 },
-      { name: "DB Sumo Squat", sets: 3, repsLow: 10, repsHigh: 12, tempo: "3-2-1-0", defaultWeight: 50, note: "Single DB held at center. 2-sec pause.", rest: 90 },
-      { name: "Single Leg Hip Thrust", sets: 3, repsLow: 12, repsHigh: 15, tempo: "2-2-1-0", defaultWeight: 35, note: "Each leg. Back on couch. Squeeze at top.", rest: 60 },
-      { name: "Deficit Reverse Lunge", sets: 3, repsLow: 10, repsHigh: 10, tempo: "3-0-1-0", defaultWeight: 40, note: "Each leg. Stand on step for extra ROM.", rest: 60 },
-      { name: "Calf Raise (both legs)", sets: 3, repsLow: 12, repsHigh: 15, tempo: "2-2-1-2", defaultWeight: 50, note: "Hold at top and bottom. Per hand.", rest: 60 },
-    ],
-  },
-  "Upper B": {
-    subtitle: "Pull Focus",
-    exercises: [
-      { name: "Single Arm DB Row", sets: 4, repsLow: 8, repsHigh: 10, tempo: "2-1-1-2", defaultWeight: 50, note: "Each arm. 2-sec squeeze at top.", rest: 90 },
-      { name: "Chest-Supported Row", sets: 3, repsLow: 10, repsHigh: 12, tempo: "2-1-1-1", defaultWeight: 40, note: "Lie face down on angled surface. Per hand.", rest: 90 },
-      { name: "DB Pullover", sets: 3, repsLow: 12, repsHigh: 15, tempo: "3-0-1-1", defaultWeight: 40, note: "Slight elbow bend. Deep stretch.", rest: 60 },
-      { name: "Seated Alternating Curl", sets: 3, repsLow: 10, repsHigh: 12, tempo: "3-0-1-1", defaultWeight: 25, note: "Each arm. Seated removes momentum.", rest: 60 },
-      { name: "Hammer Curl to Press", sets: 3, repsLow: 10, repsHigh: 10, tempo: "Controlled", defaultWeight: 25, note: "Curl up, press overhead, lower.", rest: 60 },
-    ],
-  },
-  "Day 5": {
-    subtitle: "Arms, Shoulders, Abs (Optional)",
-    exercises: [
-      { name: "Concentration Curl", sets: 3, repsLow: 10, repsHigh: 12, tempo: "3-0-1-1", defaultWeight: 25, note: "Each arm. Elbow braced on inner thigh.", rest: 60 },
-      { name: "Tricep Kickback", sets: 3, repsLow: 12, repsHigh: 15, tempo: "2-1-1-0", defaultWeight: 20, note: "Each arm. Full extension, squeeze.", rest: 60 },
-      { name: "Arnold Press", sets: 3, repsLow: 10, repsHigh: 12, tempo: "Controlled", defaultWeight: 30, note: "Rotation through the press.", rest: 60 },
-      { name: "Reverse Fly", sets: 3, repsLow: 12, repsHigh: 15, tempo: "2-1-2-0", defaultWeight: 15, note: "Bent over. Rear delts.", rest: 60 },
-      { name: "Lying Leg Raise", sets: 3, repsLow: 15, repsHigh: 20, tempo: "Controlled", defaultWeight: 0, note: "Slow and controlled.", rest: 45 },
+      { name: "Bulgarian Split Squat (Glute Focused)", sets: 4, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 35, note: "Per side. Forward lean, longer stride for glute bias", rest: 90 },
+      { name: "Single Leg Hip Thrusts (Weighted)", sets: 3, repsLow: 10, repsHigh: 20, tempo: "Controlled", defaultWeight: 30, note: "Per side. Dumbbell on hip", rest: 60 },
+      { name: "Single Leg Weighted Calf Raise", sets: 3, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 35, note: "Per side", rest: 60 },
+      { name: "Bodyweight Sliding Hamstring Curls", sets: 3, repsLow: 10, repsHigh: 20, tempo: "Controlled", defaultWeight: 0, note: "Use towel/slider on hard floor", rest: 60 },
+      { name: "Reverse Crunches", sets: 3, repsLow: 10, repsHigh: 20, tempo: "Controlled", defaultWeight: 0, note: "Controlled, no momentum", rest: 60 },
     ],
   },
 };
 
-const DAYS_ORDER = ["Lower A", "Upper A", "Lower B", "Upper B", "Day 5"];
-const WEEK_SCHEDULE = { Sat: "Lower A", Sun: "Upper A", Mon: null, Tue: "Lower B", Wed: null, Thu: "Upper B", Fri: "Day 5" };
+const DAYS_ORDER = ["Upper 1", "Lower 1", "Upper 2", "Lower 2"];
+const WEEK_SCHEDULE = { Mon: null, Tue: "Upper 2", Wed: null, Thu: "Lower 2", Fri: null, Sat: "Upper 1", Sun: "Lower 1" };
 const TECHNIQUES = ["Standard", "1.5 Reps", "Pause Reps", "Rest-Pause", "Mech. Drop Set", "Slow Tempo (+1s)"];
 const CHECKLIST_ITEMS = [
-  "Hit all 4 scheduled sessions (5 if including optional day)",
+  "Hit all 4 scheduled sessions",
   "Improved at least 2 exercises (more reps, sets, tempo, or technique)",
   "Hit 150g+ protein on at least 5 of 7 days",
   "No exercises felt 'easy' by the final set",
