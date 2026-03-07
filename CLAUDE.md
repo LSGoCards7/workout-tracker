@@ -19,7 +19,7 @@ IRON LOG — a dumbbell hypertrophy workout tracking PWA. The core application i
 ### File structure
 | File | Purpose |
 |------|---------|
-| `iron_log.html` | The entire app — CSS, HTML, JS inline (~1880 lines) |
+| `iron_log.html` | The entire app — CSS, HTML, JS inline (~2000 lines) |
 | `sw.js` | Service worker — cache-first for app shell, skip sync URLs |
 | `manifest.json` | PWA metadata — name, icons, theme, display mode |
 | `icons/` | PWA icons (192, 512 PNG + apple-touch-icon 180) |
@@ -125,10 +125,18 @@ Organized in order: FOUC `<script>` → `<style>` → `<div id="file-banner">` �
 - **Escape hatch**: Unregister via devtools → Application → Service Workers → Unregister
 
 ### Program structure
-- 4-day upper/lower dumbbell split: Upper 1, Lower 1, Upper 2, Lower 2
-- Weekly schedule: Sat/Sun/Tue/Thu workout days, Mon/Wed/Fri rest
-- Exercises defined in `PROGRAM` object with name, sets, rep range, default weight, tempo, rest time
+- MAV Hypertrophy rotation: 4 full-body workouts (A/B/C/D) cycled in order, 3 sessions/week
+- No fixed day-of-week schedule — `getNextWorkout()` determines next workout from last completed in cycle
+- `PROGRAM` object: 39 exercises across 4 workouts with name, sets, rep range, default weight, tempo, rest time
+- `LEGACY_PROGRAM`: old workout names (Upper 1/2, Lower 1/2) with exercise names only — used by `getProg()` for rendering historical data
+- `getProg(dayName)` — returns `PROGRAM[dayName] || LEGACY_PROGRAM[dayName]`, centralizes fallback for history views
 - Techniques: standard, 1.5 reps, pause reps, rest-pause, mech. drop set, slow tempo
+
+### Rest timer audio
+- `playTimerBeep()` — Web Audio API, 880Hz sine wave 0.2s at 0.3 gain
+- `ctx.resume()` for iOS Safari autoplay policy, `ctx.close()` on `osc.onended` to prevent AudioContext leak
+- `stopRest(natural)` — when `natural=true` (timer expired): plays beep, shows toast, vibrates (feature-checked for iOS)
+- Only the interval callback in `startRest()` passes `true`; skip/goBack/setDifficulty pass nothing
 
 ### Theming
 - **CSS custom properties**: All colors defined as variables in `[data-theme="dark"]` and `[data-theme="light"]` blocks

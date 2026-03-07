@@ -172,10 +172,6 @@
   .today-card h2 { font-size: 22px; font-weight: 700; color: var(--text-heading); margin-bottom: 4px; }
   .today-card .sub { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
 
-  .rest-day-card { background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: 12px; padding: 24px; margin-bottom: 24px; text-align: center; }
-  .rest-day-card h2 { font-size: 18px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; }
-  .rest-day-card p { font-size: 13px; color: var(--text-dim); }
-
   /* ===== BUTTONS ===== */
   .btn-primary { background: var(--accent); color: var(--on-accent); border: none; border-radius: 8px; padding: 12px 24px; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; width: 100%; letter-spacing: 1px; }
   .btn-primary:active { background: var(--accent-pressed); }
@@ -468,55 +464,117 @@ window.addEventListener('storage', (e) => {
   }
 });
 
-// Program swapped 2026-02-15: 5-day split → 4-day upper/lower
+// MAV Hypertrophy 3x/week rotation (4 workouts cycled in order)
 const PROGRAM = {
+  "Workout A": {
+    subtitle: "Push & Posterior Chain",
+    exercises: [
+      { name: "Flat Dumbbell Press", sets: 4, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 40, note: "Full ROM. Slight arch, retract scapulae", rest: 120 },
+      { name: "DB Chest Supported Row", sets: 4, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 35, note: "Squeeze upper back at top. Slight pause", rest: 90 },
+      { name: "DB Pullover", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 30, note: "Deep stretch. Elbows slightly bent, feel lats lengthen", rest: 90 },
+      { name: "Lean-In Lateral Raise", sets: 5, repsLow: 12, repsHigh: 20, tempo: "Controlled", defaultWeight: 15, note: "Per side. Lean away from anchor for stretch. SS w/ Incline DB Curl", rest: 60 },
+      { name: "Incline DB Curl", sets: 4, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 20, note: "Long head stretch emphasis. SS w/ Lean-In Lateral Raise", rest: 60 },
+      { name: "Prone Rear Delt Fly", sets: 3, repsLow: 15, repsHigh: 20, tempo: "Controlled", defaultWeight: 10, note: "Face down on incline bench. Pinkies up", rest: 45 },
+      { name: "DB Romanian Deadlift", sets: 4, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 40, note: "Hinge pattern. Deep hamstring stretch. Pause at bottom", rest: 120 },
+      { name: "Heel Elevated Goblet Squat", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 40, note: "Heels on plate or book for quad bias", rest: 90 },
+      { name: "DB Overhead Tricep Extension", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 35, note: "Two-handed. Full stretch at bottom. SS w/ Calf Raise", rest: 60 },
+      { name: "Single Leg Calf Raise", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 35, note: "Per side. Full ROM, pause at top. SS w/ Tricep Ext", rest: 45 },
+    ],
+  },
+  "Workout B": {
+    subtitle: "Pull & Quad Focus",
+    exercises: [
+      { name: "3-Point DB Row", sets: 4, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 40, note: "Per side. One hand on bench. Drive elbow back", rest: 90 },
+      { name: "Seated DB Shoulder Press", sets: 4, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 30, note: "Full ROM. Don't let elbows drift behind torso", rest: 120 },
+      { name: "Bulgarian Split Squat (Quad Focus)", sets: 4, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 35, note: "Per side. Upright torso, front-foot emphasis", rest: 90 },
+      { name: "DB Lateral Raise", sets: 5, repsLow: 12, repsHigh: 20, tempo: "Controlled", defaultWeight: 15, note: "Controlled negative. SS w/ DB Hammer Curl", rest: 60 },
+      { name: "DB Hammer Curl", sets: 4, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 25, note: "Neutral grip. No swing. SS w/ DB Lateral Raise", rest: 60 },
+      { name: "Incline DB Reverse Fly", sets: 3, repsLow: 15, repsHigh: 20, tempo: "Controlled", defaultWeight: 10, note: "Chest on incline bench. Elbows slightly bent. SS w/ Reverse Crunch", rest: 60 },
+      { name: "Reverse Crunches", sets: 3, repsLow: 10, repsHigh: 20, tempo: "Controlled", defaultWeight: 0, note: "Controlled, no momentum. SS w/ Incline DB Reverse Fly", rest: 45 },
+      { name: "Single Leg Hip Thrust", sets: 3, repsLow: 10, repsHigh: 20, tempo: "Controlled", defaultWeight: 30, note: "Per side. Dumbbell on hip. Squeeze glute at top", rest: 60 },
+      { name: "Single Leg Calf Raise", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 35, note: "Per side. Full ROM", rest: 45 },
+    ],
+  },
+  "Workout C": {
+    subtitle: "Arms & Glute Emphasis",
+    exercises: [
+      { name: "DB Chest Supported Row (Wide Elbows)", sets: 4, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 30, note: "Elbows flared ~45 degrees. Upper back and rear delt emphasis", rest: 90 },
+      { name: "Low Incline DB Press", sets: 4, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 40, note: "~30 degree incline for upper chest emphasis", rest: 120 },
+      { name: "Bulgarian Split Squat (Glute Focus)", sets: 4, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 35, note: "Per side. Forward lean, longer stride for glute bias", rest: 90 },
+      { name: "Lean-In Lateral Raise", sets: 5, repsLow: 12, repsHigh: 20, tempo: "Controlled", defaultWeight: 15, note: "Per side. Lean away from anchor for stretch", rest: 60 },
+      { name: "Incline DB Overhead Extension", sets: 4, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 30, note: "Lying on incline. Deep stretch at bottom. SS w/ Concentration Curl", rest: 60 },
+      { name: "Concentration Curl", sets: 4, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 20, note: "Per arm. Slow negative. SS w/ Incline DB Overhead Ext", rest: 60 },
+      { name: "Bodyweight Sliding Hamstring Curl", sets: 3, repsLow: 10, repsHigh: 20, tempo: "Controlled", defaultWeight: 0, note: "Use towel or slider on hard floor", rest: 60 },
+      { name: "Prone Rear Delt Fly", sets: 3, repsLow: 15, repsHigh: 20, tempo: "Controlled", defaultWeight: 10, note: "Face down on incline bench. SS w/ Single Leg Calf Raise", rest: 45 },
+      { name: "Single Leg Calf Raise", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 35, note: "Per side. SS w/ Prone Rear Delt Fly", rest: 45 },
+    ],
+  },
+  "Workout D": {
+    subtitle: "Back & Hamstring Focus",
+    exercises: [
+      { name: "Deficit Bent-Over DB Row", sets: 5, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 40, note: "Stand on plate or step for extra ROM. Drive elbows past torso", rest: 90 },
+      { name: "DB Pullover", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 30, note: "Deep stretch. Focus on lat engagement", rest: 90 },
+      { name: "Flat DB Press", sets: 3, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 40, note: "Maintenance volume. Full ROM", rest: 120 },
+      { name: "DB Lateral Raise", sets: 5, repsLow: 12, repsHigh: 20, tempo: "Controlled", defaultWeight: 15, note: "SS w/ Standing DB Curl", rest: 60 },
+      { name: "Standing DB Curl", sets: 4, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 25, note: "Alternating or bilateral. SS w/ DB Lateral Raise", rest: 60 },
+      { name: "Incline DB Reverse Fly", sets: 3, repsLow: 15, repsHigh: 20, tempo: "Controlled", defaultWeight: 10, note: "Rear delt focus. Light weight, high reps", rest: 60 },
+      { name: "DB Romanian Deadlift", sets: 4, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 40, note: "Hinge pattern. Deep hamstring stretch", rest: 120 },
+      { name: "Heel Elevated Goblet Squat", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 40, note: "Heels elevated for quad bias", rest: 90 },
+      { name: "Close-Grip DB Floor Press", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 35, note: "Neutral grip. Tricep emphasis. SS w/ Dead Bug", rest: 60 },
+      { name: "Dead Bug", sets: 2, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 0, note: "Core stability. SS w/ Close-Grip DB Floor Press", rest: 45 },
+      { name: "Single Leg Calf Raise", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 35, note: "Per side. Full ROM", rest: 45 },
+    ],
+  },
+};
+
+const DAYS_ORDER = ["Workout A", "Workout B", "Workout C", "Workout D"];
+
+// Old program names for rendering historical data
+const LEGACY_PROGRAM = {
   "Upper 1": {
     subtitle: "Press & Pull",
     exercises: [
-      { name: "Flat Dumbbell Press", sets: 4, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 40, note: "", rest: 90 },
-      { name: "Seated Dumbbell Shoulder Press", sets: 3, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 30, note: "", rest: 90 },
-      { name: "DB Chest Supported Row", sets: 4, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 35, note: "Emphasize upper back squeeze", rest: 90 },
-      { name: "Lean-In Lateral Raise", sets: 3, repsLow: 10, repsHigh: 20, tempo: "Controlled", defaultWeight: 15, note: "Per side. Lean away from anchor for stretch", rest: 60 },
-      { name: "DB Overhead Tricep Extensions", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 35, note: "Two-handed or single arm", rest: 60 },
+      { name: "Flat Dumbbell Press" },
+      { name: "Seated Dumbbell Shoulder Press" },
+      { name: "DB Chest Supported Row" },
+      { name: "Lean-In Lateral Raise" },
+      { name: "DB Overhead Tricep Extensions" },
     ],
   },
   "Lower 1": {
     subtitle: "Quad Focus",
     exercises: [
-      { name: "Bulgarian Split Squat (Quad Focused)", sets: 3, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 35, note: "Per side. Upright torso, front-foot emphasis", rest: 90 },
-      { name: "Dumbbell Romanian Deadlift", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 40, note: "Hinge pattern, hamstring stretch", rest: 90 },
-      { name: "Heel Elevated Goblet Squat", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 40, note: "Elevate heels on plate or book for quad bias", rest: 90 },
-      { name: "Single Leg Weighted Calf Raise", sets: 3, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 35, note: "Per side. Superset with Dead Bug", rest: 60 },
-      { name: "Dead Bug", sets: 1, repsLow: 5, repsHigh: 10, tempo: "Controlled", defaultWeight: 0, note: "Core stability. Superset with Calf Raises", rest: 60 },
+      { name: "Bulgarian Split Squat (Quad Focused)" },
+      { name: "Dumbbell Romanian Deadlift" },
+      { name: "Heel Elevated Goblet Squat" },
+      { name: "Single Leg Weighted Calf Raise" },
+      { name: "Dead Bug" },
     ],
   },
   "Upper 2": {
     subtitle: "Incline & Arms",
     exercises: [
-      { name: "Low Incline Dumbbell Press", sets: 4, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 40, note: "~30° incline for upper chest emphasis", rest: 90 },
-      { name: "3-Point Dumbbell Row", sets: 4, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 40, note: "Per side. One hand on bench", rest: 90 },
-      { name: "Dumbbell Lateral Raises", sets: 3, repsLow: 10, repsHigh: 20, tempo: "Controlled", defaultWeight: 15, note: "Superset with Incline Overhead Extensions", rest: 60 },
-      { name: "Incline DB Overhead Extensions", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 30, note: "Lying on incline bench. Superset with Lateral Raises", rest: 60 },
-      { name: "Prone Arm Circles (Weighted)", sets: 3, repsLow: 10, repsHigh: 15, tempo: "Controlled", defaultWeight: 5, note: "Light weight. Rear delt / rotator cuff health", rest: 60 },
+      { name: "Low Incline Dumbbell Press" },
+      { name: "3-Point Dumbbell Row" },
+      { name: "Dumbbell Lateral Raises" },
+      { name: "Incline DB Overhead Extensions" },
+      { name: "Prone Arm Circles (Weighted)" },
     ],
   },
   "Lower 2": {
     subtitle: "Glute Focus",
     exercises: [
-      { name: "Bulgarian Split Squat (Glute Focused)", sets: 4, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 35, note: "Per side. Forward lean, longer stride for glute bias", rest: 90 },
-      { name: "Single Leg Hip Thrusts (Weighted)", sets: 3, repsLow: 10, repsHigh: 20, tempo: "Controlled", defaultWeight: 30, note: "Per side. Dumbbell on hip", rest: 60 },
-      { name: "Single Leg Weighted Calf Raise", sets: 3, repsLow: 8, repsHigh: 12, tempo: "Controlled", defaultWeight: 35, note: "Per side", rest: 60 },
-      { name: "Bodyweight Sliding Hamstring Curls", sets: 3, repsLow: 10, repsHigh: 20, tempo: "Controlled", defaultWeight: 0, note: "Use towel/slider on hard floor", rest: 60 },
-      { name: "Reverse Crunches", sets: 3, repsLow: 10, repsHigh: 20, tempo: "Controlled", defaultWeight: 0, note: "Controlled, no momentum", rest: 60 },
+      { name: "Bulgarian Split Squat (Glute Focused)" },
+      { name: "Single Leg Hip Thrusts (Weighted)" },
+      { name: "Single Leg Weighted Calf Raise" },
+      { name: "Bodyweight Sliding Hamstring Curls" },
+      { name: "Reverse Crunches" },
     ],
   },
 };
-
-const DAYS_ORDER = ["Upper 1", "Lower 1", "Upper 2", "Lower 2"];
-const WEEK_SCHEDULE = { Mon: null, Tue: "Upper 2", Wed: null, Thu: "Lower 2", Fri: null, Sat: "Upper 1", Sun: "Lower 1" };
 const TECHNIQUES = ["Standard", "1.5 Reps", "Pause Reps", "Rest-Pause", "Mech. Drop Set", "Slow Tempo (+1s)"];
 const CHECKLIST_ITEMS = [
-  "Hit all 4 scheduled sessions",
+  "Hit all 3 scheduled sessions",
   "Improved at least 2 exercises (more reps, sets, tempo, or technique)",
   "Hit 150g+ protein on at least 5 of 7 days",
   "No exercises felt 'easy' by the final set",
@@ -527,7 +585,6 @@ let state = { view: "home", activeDay: null, workoutData: {}, history: {}, check
 let syncDebounceTimer = null;
 
 function getToday() { return new Date().toISOString().split("T")[0]; }
-function getDayName() { return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date().getDay()]; }
 function getWeekId(d) {
   const date = new Date(d); date.setHours(0,0,0,0);
   const dayNum = date.getDay() || 7;
@@ -542,6 +599,8 @@ function snapWeight(w) { return Math.round(w / 5) * 5; }
 function hasCompletedSets(dayData) {
   return Object.values(dayData).some(ex => ex.sets?.some(s => s.completed));
 }
+
+function getProg(dayName) { return PROGRAM[dayName] || LEGACY_PROGRAM[dayName]; }
 
 function loadData() {
   try {
@@ -645,6 +704,22 @@ function getWeekSessions() {
     }
   });
   return c;
+}
+
+function getNextWorkout() {
+  const dates = Object.keys(state.history).sort().reverse();
+  for (const date of dates) {
+    let lastInCycle = null;
+    for (const key of Object.keys(state.history[date])) {
+      if (key === '__meta') continue;
+      if (!hasCompletedSets(state.history[date][key])) continue;
+      const idx = DAYS_ORDER.indexOf(key);
+      if (idx === -1) continue;
+      if (lastInCycle === null || idx > lastInCycle) lastInCycle = idx;
+    }
+    if (lastInCycle !== null) return DAYS_ORDER[(lastInCycle + 1) % DAYS_ORDER.length];
+  }
+  return DAYS_ORDER[0];
 }
 
 function startWorkout(dayName) {
@@ -776,17 +851,44 @@ function renderTimer() {
   document.getElementById("app").classList.toggle("timer-active", state.restTimeLeft > 0);
 }
 
+function playTimerBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    ctx.resume().then(() => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      osc.type = 'sine';
+      gain.gain.value = 0.3;
+      osc.start();
+      osc.stop(ctx.currentTime + 0.2);
+      osc.onended = () => ctx.close();
+    });
+  } catch(e) { /* Audio not available */ }
+}
+
 function startRest(seconds) {
   stopRest(); state.restTimeLeft = seconds; state.restDuration = seconds;
   state.restInterval = setInterval(() => {
     state.restTimeLeft--;
-    if (state.restTimeLeft <= 0) { stopRest(); return; }
+    if (state.restTimeLeft <= 0) { stopRest(true); return; }
     renderTimer();
   }, 1000);
   renderTimer();
 }
 
-function stopRest() { if (state.restInterval) clearInterval(state.restInterval); state.restInterval = null; state.restTimeLeft = 0; state.restDuration = 0; renderTimer(); }
+function stopRest(natural) {
+  if (state.restInterval) clearInterval(state.restInterval);
+  state.restInterval = null; state.restTimeLeft = 0; state.restDuration = 0;
+  if (natural) {
+    playTimerBeep();
+    showToast('Rest complete', 'success');
+    if (navigator.vibrate) navigator.vibrate(200);
+  }
+  renderTimer();
+}
 
 function toggleChecklist(i) {
   const wid = getWeekId(new Date()); const cur = state.checklist[wid] || [];
@@ -1426,21 +1528,46 @@ function renderLineChart(dataPoints, options = {}) {
 }
 
 function renderHome() {
-  const day = getDayName(); const suggested = WEEK_SCHEDULE[day]; const ws = getWeekSessions();
+  const suggested = getNextWorkout(); const ws = getWeekSessions();
   const wid = getWeekId(new Date()); const checked = state.checklist[wid] || [];
   const today = getToday();
 
+  // Find today's completed workout(s)
+  let completedToday = null;
+  if (state.history[today]) {
+    for (const key of Object.keys(state.history[today])) {
+      if (key === '__meta') continue;
+      if (!hasCompletedSets(state.history[today][key])) continue;
+      const idx = DAYS_ORDER.indexOf(key);
+      if (idx === -1) continue;
+      if (completedToday === null || idx > completedToday.idx) completedToday = { name: key, idx };
+    }
+  }
+
   let todayHTML = "";
-  if (suggested) {
-    const hasDone = state.history[today]?.[suggested] && hasCompletedSets(state.history[today][suggested]);
+  if (completedToday) {
+    const nextAfterCompleted = DAYS_ORDER[(completedToday.idx + 1) % DAYS_ORDER.length];
     todayHTML = `<div class="today-card">
-      <div class="label">TODAY — ${day.toUpperCase()}</div>
+      <div class="label">COMPLETED TODAY</div>
+      <h2>${completedToday.name}</h2>
+      <div class="sub">${PROGRAM[completedToday.name].subtitle}</div>
+      <button class="btn-primary" onclick="startWorkout('${completedToday.name}')">Continue Workout →</button>
+    </div>`;
+    if (nextAfterCompleted !== completedToday.name) {
+      todayHTML += `<div class="today-card" style="margin-top:-8px">
+        <div class="label">NEXT UP</div>
+        <h2>${nextAfterCompleted}</h2>
+        <div class="sub">${PROGRAM[nextAfterCompleted].subtitle}</div>
+        <button class="btn-primary" onclick="startWorkout('${nextAfterCompleted}')">Start Workout →</button>
+      </div>`;
+    }
+  } else {
+    todayHTML = `<div class="today-card">
+      <div class="label">NEXT UP</div>
       <h2>${suggested}</h2>
       <div class="sub">${PROGRAM[suggested].subtitle}</div>
-      <button class="btn-primary" onclick="startWorkout('${suggested}')">${hasDone ? "Continue Workout →" : "Start Workout →"}</button>
+      <button class="btn-primary" onclick="startWorkout('${suggested}')">Start Workout →</button>
     </div>`;
-  } else {
-    todayHTML = `<div class="rest-day-card"><h2>Rest Day</h2><p>Recover. Eat protein. Come back stronger.</p></div>`;
   }
 
   let dayCards = DAYS_ORDER.map(d => {
@@ -1468,7 +1595,7 @@ function renderHome() {
 
   return `
     <div class="header">
-      <div><h1>IRON LOG</h1><div class="sub">Dumbbell Hypertrophy Program</div></div>
+      <div><h1>IRON LOG</h1><div class="sub">MAV Hypertrophy — 3x/Week</div></div>
       <div style="display:flex;gap:10px;align-items:flex-start"><div class="week-badge"><span class="num">${ws}</span><span class="label">this week</span></div><button class="gear-btn" onclick="state.view='settings';render()">⚙</button></div>
     </div>
     ${todayHTML}
@@ -1523,7 +1650,7 @@ function renderWorkout() {
       </div>
       <div class="sets-container">${setsHTML}</div>
       <input class="notes-input" placeholder="Notes..." value="${esc(d.notes || '')}" oninput="state.workoutData[${i}].notes=this.value">
-      ${isReadyToProgress(i) ? `<div class="overload-badge">${d.weight >= 50 ? 'At max weight — try a harder technique' : 'Hit ' + ex.repsHigh + ' on all sets — try ' + (d.weight + 5) + ' lbs next time'}</div>` : ''}
+      ${isReadyToProgress(i) ? `<div class="overload-badge">${d.weight >= 50 ? 'At max dumbbell weight — try a harder technique or add a set' : 'Hit ' + ex.repsHigh + ' on all sets — try ' + (d.weight + 5) + ' lbs next time'}</div>` : ''}
     </div>`;
   }).join("");
 
@@ -1550,7 +1677,7 @@ function renderHistory() {
         return m >= 60 ? Math.floor(m/60) + 'h ' + (m%60) + 'min' : m + ' min';
       })() : '';
       let cards = Object.entries(state.history[date]).filter(([dayName]) => dayName !== '__meta').map(([dayName, exercises]) => {
-        let rows = PROGRAM[dayName]?.exercises.map((ex, i) => {
+        let rows = getProg(dayName)?.exercises.map((ex, i) => {
           const d = exercises[i]; if (!d) return "";
           const reps = d.sets.map(s => s.reps).join("/");
           const tech = d.technique !== "Standard" ? ` · ${d.technique}` : "";
@@ -1565,7 +1692,7 @@ function renderHistory() {
           const cls = d <= 3 ? 'rpe-easy' : d <= 6 ? 'rpe-medium' : 'rpe-hard';
           return '<span class="rpe-pip ' + cls + '">RPE ' + d + '</span>';
         })() : '';
-        return `<div class="history-card"><div class="history-day-name">${dayName} — ${PROGRAM[dayName]?.subtitle || ''}${dur ? ' · ' + dur : ''}${diff}</div>${rows}${sessionVolHTML}</div>`;
+        return `<div class="history-card"><div class="history-day-name">${dayName} — ${getProg(dayName)?.subtitle || ''}${dur ? ' · ' + dur : ''}${diff}</div>${rows}${sessionVolHTML}</div>`;
       }).join("");
       return `<div class="history-block"><div class="history-date">${dateStr}</div>${cards}</div>`;
     }).join("");
